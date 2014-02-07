@@ -26,11 +26,10 @@
  */
 package org.controlsfx.control.spreadsheet;
 
-import java.util.Map;
-
 import javafx.collections.ObservableList;
 import javafx.event.EventHandler;
 import javafx.event.EventType;
+import javafx.util.Callback;
 
 import org.controlsfx.control.spreadsheet.SpreadsheetView.SpanType;
 
@@ -57,11 +56,12 @@ import org.controlsfx.control.spreadsheet.SpreadsheetView.SpanType;
  * within each row. Therefore, if you are wanting to iterate through all columns
  * in every row of the grid, you would do something like this:
  * 
+ * 
  * <h3> Code Sample </h3>
  * <pre>
  * Grid grid = ...
  * for (int row = 0; row < grid.getRowCount(); row++) {
- *     for (int column = 0; column < grid.getColumnCount(); column++) {
+ *     for (int column = 0; column &lt; grid.getColumnCount(); column++) {
  *         SpreadsheetCell&lt;?&gt; cell = getRows().get(row).get(column);
  *         doStuff(cell);
  *     }
@@ -96,8 +96,8 @@ public interface Grid {
     /**
      * Change the value situated at the intersection if possible.
      * Verification and conversion of the value should be done before 
-     * with {@link SpreadsheetCellType#match(SpreadsheetCell, SpreadsheetCell)}
-     * and {@link SpreadsheetCellType#convertValue(String)}.
+     * with {@link SpreadsheetCellType#match(Object)}
+     * and {@link SpreadsheetCellType#convertValue(Object)}.
      * @param row
      * @param column
      * @param value
@@ -115,7 +115,7 @@ public interface Grid {
     
     /**
      * Return the height of a row. 
-     * It will first look into the {@link Map} provided at the
+     * It will first look into the {@link Callback}provided at the
      * initialization. If nothing's found, default height will be taken.
      * @param row
      * @return the height of a row.

@@ -34,6 +34,7 @@ import javafx.beans.property.BooleanProperty;
 import javafx.beans.property.ReadOnlyBooleanProperty;
 import javafx.beans.property.ReadOnlyDoubleProperty;
 import javafx.beans.property.StringProperty;
+import javafx.collections.ObservableList;
 import javafx.css.PseudoClass;
 import javafx.event.ActionEvent;
 import javafx.event.EventHandler;
@@ -186,12 +187,14 @@ abstract class FXDialog {
 
         // add close min max
         closeButton = new WindowButton("close");
+        closeButton.setFocusTraversable(false);
         closeButton.setOnAction(new EventHandler<ActionEvent>() {
             @Override public void handle(ActionEvent event) {
                 FXDialog.this.hide();
             }
         });
         minButton = new WindowButton("minimize");
+        minButton.setFocusTraversable(false);
         minButton.setOnAction(new EventHandler<ActionEvent>() {
             @Override public void handle(ActionEvent event) {
                 setIconified(isIconified());
@@ -199,6 +202,7 @@ abstract class FXDialog {
         });
 
         maxButton = new WindowButton("maximize");
+        maxButton.setFocusTraversable(false);
 
         windowBtns = new HBox(3);
         windowBtns.getStyleClass().add("window-buttons");
@@ -242,6 +246,8 @@ abstract class FXDialog {
     
     // --- root
     public abstract Node getRoot();
+    
+    public abstract ObservableList<String> getStylesheets();
     
     
     // --- width

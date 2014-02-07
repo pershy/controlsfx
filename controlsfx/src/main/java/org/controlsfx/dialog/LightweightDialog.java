@@ -4,6 +4,8 @@ import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.util.Iterator;
 
+import javafx.beans.InvalidationListener;
+import javafx.beans.Observable;
 import javafx.beans.property.BooleanProperty;
 import javafx.beans.property.ReadOnlyDoubleProperty;
 import javafx.beans.property.SimpleBooleanProperty;
@@ -189,6 +191,11 @@ class LightweightDialog extends FXDialog {
         return modal;
     }
     
+    @Override 
+    public ObservableList<String> getStylesheets(){
+        return scene.getStylesheets();
+    }
+    
     public void setEffect(Effect e) {
         this.effect = e;
     }
@@ -201,7 +208,7 @@ class LightweightDialog extends FXDialog {
     }
     
     @Override public void show() {
-        if (owner != null) {
+        if (owner != null && owner.getParent() != null) {
             showInParent();
         } else if (scene != null) {
             showInScene();
@@ -339,6 +346,7 @@ class LightweightDialog extends FXDialog {
         
         lightweightDialog.setVisible(true);
         scene.setRoot(dialogStack);
+        lightweightDialog.requestFocus();
     }
     
     private void showInParent() {
@@ -356,17 +364,23 @@ class LightweightDialog extends FXDialog {
         ownerParentChildren.add(ownerPos, dialogStack);
         
         lightweightDialog.setVisible(true);
+        lightweightDialog.requestFocus();
     }
     
     private void installCSSInScene() {
+        String dialogsCssUrl = DIALOGS_CSS_URL.toExternalForm();
         if (scene != null) {
             // install CSS
-            scene.getStylesheets().addAll(DIALOGS_CSS_URL.toExternalForm());
+            if(!scene.getStylesheets().contains(dialogsCssUrl)){
+                scene.getStylesheets().addAll(dialogsCssUrl);
+            }
         } else if (owner != null) {
             Scene _scene = owner.getScene();
             if (_scene != null) {
                 // install CSS
-                _scene.getStylesheets().addAll(DIALOGS_CSS_URL.toExternalForm());
+                if(!scene.getStylesheets().contains(dialogsCssUrl)){
+                    _scene.getStylesheets().addAll(dialogsCssUrl);
+                }
             }
         }
     }
