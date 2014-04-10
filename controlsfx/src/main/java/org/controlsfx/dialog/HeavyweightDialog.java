@@ -43,6 +43,7 @@ import javafx.event.EventType;
 import javafx.geometry.Point2D;
 import javafx.scene.Node;
 import javafx.scene.Scene;
+import javafx.scene.effect.Effect;
 import javafx.scene.input.MouseEvent;
 import javafx.scene.layout.Pane;
 import javafx.scene.paint.Color;
@@ -96,8 +97,24 @@ class HeavyweightDialog extends FXDialog {
                 if (owner != null) {
                     // because Stage does not seem to centre itself over its owner, we
                     // do it here.
-                    final double x = owner.getX() + (owner.getWidth() / 2.0) - (root.prefWidth(-1) / 2.0);
-                    final double y = owner.getY() + (owner.getHeight() / 2.0) - (root.prefHeight(-1)) / 2.0 - 50;
+                    double x, y;
+                    
+                    final double dialogWidth = root.prefWidth(-1);
+                    final double dialogHeight = root.prefHeight(-1);
+                    
+                    if (owner.getX() < 0 || owner.getY() < 0) {
+                        // Fix for #165
+                        Screen screen = Screen.getPrimary(); // todo something more sensible
+                        double maxW = screen.getVisualBounds().getWidth();
+                        double maxH = screen.getVisualBounds().getHeight();
+                        
+                        x = maxW / 2.0 - dialogWidth / 2.0;
+                        y = maxH / 2.0 - dialogHeight / 2.0 - 50;
+                    } else {
+                        x = owner.getX() + (owner.getWidth() / 2.0) - (dialogWidth / 2.0);
+                        y = owner.getY() + (owner.getHeight() / 2.0) - dialogHeight / 2.0 - 50;
+                    }
+                    
                     setX(x);
                     setY(y);
                 }
@@ -115,8 +132,8 @@ class HeavyweightDialog extends FXDialog {
 
         // *** The rest is for adding window decorations ***
         init(title, useCustomChrome);
-        lightweightDialog.getStyleClass().add("heavyweight");
-        lightweightDialog.getStyleClass().add(useCustomChrome ? "custom-chrome" : "native-chrome");
+        lightweightDialog.getStyleClass().add("heavyweight"); //$NON-NLS-1$
+        lightweightDialog.getStyleClass().add(useCustomChrome ? "custom-chrome" : "native-chrome"); //$NON-NLS-1$ //$NON-NLS-2$
 
         Scene scene = new Scene(lightweightDialog);
         scene.getStylesheets().addAll(DIALOGS_CSS_URL.toExternalForm());
@@ -290,6 +307,11 @@ class HeavyweightDialog extends FXDialog {
     @Override boolean isIconified() {
         return stage.isIconified();
     }
+    
+    @Override
+    void setEffect(Effect e) {
+        // not implemented for heavyweight dialogs
+    }
 
     
     
@@ -298,7 +320,7 @@ class HeavyweightDialog extends FXDialog {
      * Stylesheet Handling                                                     *
      *                                                                         *
      **************************************************************************/
-    private static final PseudoClass ACTIVE_PSEUDO_CLASS = PseudoClass.getPseudoClass("active");
+    private static final PseudoClass ACTIVE_PSEUDO_CLASS = PseudoClass.getPseudoClass("active"); //$NON-NLS-1$
 
 }
 

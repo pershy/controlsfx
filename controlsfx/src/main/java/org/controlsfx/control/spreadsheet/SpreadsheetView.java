@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2013, ControlsFX
+ * Copyright (c) 2013, 2014 ControlsFX
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -44,6 +44,7 @@ import com.sun.javafx.collections.NonIterableChange;
 import com.sun.javafx.collections.NonIterableChange.GenericAddRemoveChange;
 import com.sun.javafx.scene.control.ReadOnlyUnbackedObservableList;
 import com.sun.javafx.scene.control.SelectedCellsMap;
+import java.util.Optional;
 
 import javafx.animation.KeyFrame;
 import javafx.animation.Timeline;
@@ -56,11 +57,14 @@ import javafx.beans.property.SimpleBooleanProperty;
 import javafx.beans.property.SimpleObjectProperty;
 import javafx.beans.value.ChangeListener;
 import javafx.beans.value.ObservableValue;
+import javafx.beans.value.WeakChangeListener;
 import javafx.collections.FXCollections;
 import javafx.collections.ListChangeListener;
 import javafx.collections.ObservableList;
+import javafx.collections.WeakListChangeListener;
 import javafx.event.ActionEvent;
 import javafx.event.EventHandler;
+import javafx.event.WeakEventHandler;
 import javafx.scene.Node;
 import javafx.scene.control.ContextMenu;
 import javafx.scene.control.Control;
@@ -100,6 +104,7 @@ import javafx.util.Duration;
  * they are always visible on screen. Only columns without any spanning cells
  * can be fixed.</li>
  * <li>A row header can be switched on in order to display the row number.</li>
+ * <li>Rows can be resized just like columns with click & drag.</li>
  * <li>Both row and column header can be visible or invisible.</li>
  * <li>Selection of several cells can be made with a click and drag.</li>
  * <li>A copy/paste context menu is accessible with a right-click or the usual
@@ -109,11 +114,9 @@ import javafx.util.Duration;
  * <br/>
  * 
  * <h3>Fixing Rows and Columns</h3> You can fix some rows and some columns by
- * right-clicking on their header (if it has a dot, then it means it can be
- * fixed). A context menu will appear if it's possible to fix them. The label
- * will then be in italic and the dot will be replaced by a colon to confirm
- * that the fixing has been done properly. Keep in mind that only columns
- * without any spanning cells can be fixed.
+ * right-clicking on their header. A context menu will appear if it's possible to fix them. 
+ * The label will then be in italic and the background will turn to dark grey. 
+ * Keep in mind that only columns without any spanning cells can be fixed.
  * 
  * And that and only rows without row-spanning cells can be fixed. <br/>
  * You have also the possibility to fix them manually by adding and removing
@@ -292,8 +295,6 @@ public class SpreadsheetView extends Control {
      */
     public SpreadsheetView(final Grid grid) {
         super();
-        // Reactivate that after
-        verifyGrid(grid);
         getStyleClass().add("SpreadsheetView");
         // anonymous skin
         setSkin(new Skin<SpreadsheetView>() {
@@ -371,6 +372,7 @@ public class SpreadsheetView extends Control {
                     @SuppressWarnings("unchecked")
                     TablePosition<ObservableList<SpreadsheetCell>, ?> position = (TablePosition<ObservableList<SpreadsheetCell>, ?>) cellsView
                             .getFocusModel().getFocusedCell();
+                    cellsView.setEditWithKey(true);
                     cellsView.edit(position.getRow(), position.getTableColumn());
                 }
             }
@@ -379,30 +381,7 @@ public class SpreadsheetView extends Control {
         /**
          * ContextMenu handling.
          */
-        this.contextMenuProperty().addListener(new ChangeListener<ContextMenu>() {
-            @Override
-            public void changed(ObservableValue<? extends ContextMenu> arg0, ContextMenu arg1, final ContextMenu arg2) {
-                arg2.setOnShowing(new EventHandler<WindowEvent>() {
-                    @Override
-                    public void handle(WindowEvent arg0) {
-                        // We don't want to open a contextMenu when editing
-                        // because editors
-                        // have their own contextMenu
-                        if (getEditingCell() != null) {
-                            // We're being reactive but we want to be pro-active
-                            // so we may need a work-around.
-                            final Runnable r = new Runnable() {
-                                @Override
-                                public void run() {
-                                    arg2.hide();
-                                }
-                            };
-                            Platform.runLater(r);
-                        }
-                    }
-                });
-            }
-        });
+        this.contextMenuProperty().addListener(new WeakChangeListener<>(contextMenuChangeListener));
         // The contextMenu creation must be on the JFX thread
         final Runnable r = new Runnable() {
             @Override
@@ -421,7 +400,6 @@ public class SpreadsheetView extends Control {
 
         // getModifiedCells().addListener(modifiedCellsListener);
     }
-
     /***************************************************************************
      * * Public Methods * *
      **************************************************************************/
@@ -436,6 +414,8 @@ public class SpreadsheetView extends Control {
      *            the new Grid
      */
     public final void setGrid(Grid grid) {
+        // Reactivate that after
+//        verifyGrid(grid);
         gridProperty.set(grid);
         initRowFix(grid);
 
@@ -775,13 +755,16 @@ public class SpreadsheetView extends Control {
      * @param cellType
      * @return the editor associated with the CellType.
      */
-    public final SpreadsheetCellEditor getEditor(SpreadsheetCellType<?> cellType) {
+    public final Optional<SpreadsheetCellEditor> getEditor(SpreadsheetCellType<?> cellType) {
         SpreadsheetCellEditor cellEditor = editors.get(cellType);
         if (cellEditor == null) {
             cellEditor = cellType.createEditor(this);
+            if(cellEditor == null){
+                return Optional.empty();
+            }
             editors.put(cellType, cellEditor);
         }
-        return cellEditor;
+        return Optional.of(cellEditor);
     }
 
     /**
@@ -863,43 +846,12 @@ public class SpreadsheetView extends Control {
 
             @SuppressWarnings("unchecked")
             final ArrayList<GridChange> list = (ArrayList<GridChange>) clipboard.getContent(fmt);
-            // TODO algorithm very bad
-            int minRow = getGrid().getRowCount();
-            int minCol = getGrid().getColumnCount();
-            int maxRow = 0;
-            int maxCol = 0;
-            for (final GridChange p : list) {
-                final int tempcol = p.getColumn();
-                final int temprow = p.getRow();
-                if (tempcol < minCol) {
-                    minCol = tempcol;
-                }
-                if (tempcol > maxCol) {
-                    maxCol = tempcol;
-                }
-                if (temprow < minRow) {
-                    minRow = temprow;
-                }
-                if (temprow > maxRow) {
-                    maxRow = temprow;
-                }
-            }
-
-            final TablePosition<?, ?> p = cellsView.getFocusModel().getFocusedCell();
-
-            final int offsetRow = p.getRow() - minRow;
-            final int offsetCol = p.getColumn() - minCol;
-            int row;
-            int column;
-
-            for (final GridChange change : list) {
-                row = change.getRow();
-                column = change.getColumn();
-                if (row + offsetRow < getGrid().getRowCount() && column + offsetCol < getGrid().getColumnCount()
-                        && row + offsetRow >= 0 && column + offsetCol >= 0) {
-                    final SpanType type = getSpanType(row + offsetRow, column + offsetCol);
+            if(list.size() == 1){
+                GridChange change = list.get(0);
+                for(TablePosition position:getSelectionModel().getSelectedCells()){
+                    final SpanType type = getSpanType(position.getRow(), position.getColumn());
                     if (type == SpanType.NORMAL_CELL || type == SpanType.ROW_VISIBLE) {
-                        SpreadsheetCell cell = getGrid().getRows().get(row + offsetRow).get(column + offsetCol);
+                        SpreadsheetCell cell = getGrid().getRows().get(position.getRow()).get(position.getColumn());
                         boolean succeed = cell.getCellType().match(change.getNewValue());
                         if (succeed) {
                             getGrid().setCellValue(cell.getRow(), cell.getColumn(),
@@ -907,8 +859,53 @@ public class SpreadsheetView extends Control {
                         }
                     }
                 }
-            }
+            }else{
+                // TODO algorithm very bad
+                int minRow = getGrid().getRowCount();
+                int minCol = getGrid().getColumnCount();
+                int maxRow = 0;
+                int maxCol = 0;
+                for (final GridChange p : list) {
+                    final int tempcol = p.getColumn();
+                    final int temprow = p.getRow();
+                    if (tempcol < minCol) {
+                        minCol = tempcol;
+                    }
+                    if (tempcol > maxCol) {
+                        maxCol = tempcol;
+                    }
+                    if (temprow < minRow) {
+                        minRow = temprow;
+                    }
+                    if (temprow > maxRow) {
+                        maxRow = temprow;
+                    }
+                }
 
+                final TablePosition<?, ?> p = cellsView.getFocusModel().getFocusedCell();
+
+                final int offsetRow = p.getRow() - minRow;
+                final int offsetCol = p.getColumn() - minCol;
+                int row;
+                int column;
+
+                for (final GridChange change : list) {
+                    row = change.getRow();
+                    column = change.getColumn();
+                    if (row + offsetRow < getGrid().getRowCount() && column + offsetCol < getGrid().getColumnCount()
+                            && row + offsetRow >= 0 && column + offsetCol >= 0) {
+                        final SpanType type = getSpanType(row + offsetRow, column + offsetCol);
+                        if (type == SpanType.NORMAL_CELL || type == SpanType.ROW_VISIBLE) {
+                            SpreadsheetCell cell = getGrid().getRows().get(row + offsetRow).get(column + offsetCol);
+                            boolean succeed = cell.getCellType().match(change.getNewValue());
+                            if (succeed) {
+                                getGrid().setCellValue(cell.getRow(), cell.getColumn(),
+                                        cell.getCellType().convertValue(change.getNewValue()));
+                            }
+                        }
+                    }
+                }
+            }
             // To be improved
         } else if (clipboard.hasString()) {
             // final TablePosition<?,?> p =
@@ -1266,7 +1263,9 @@ public class SpreadsheetView extends Control {
         /**
          * Make the tableView move when selection operating outside bounds
          */
-        private final Timeline timer = new Timeline(new KeyFrame(Duration.millis(100), new EventHandler<ActionEvent>() {
+        private final Timeline timer;
+
+        EventHandler<ActionEvent> timerEventHandler = new EventHandler<ActionEvent>() {
             @Override
             public void handle(ActionEvent event) {
                 GridViewSkin skin = (GridViewSkin) getCellsViewSkin();
@@ -1288,8 +1287,7 @@ public class SpreadsheetView extends Control {
                         skin.getVBar().decrement();
                 }
             }
-        }));
-
+        };
         /**
          * When the drag is over, we remove the listener and stop the timer
          */
@@ -1302,6 +1300,45 @@ public class SpreadsheetView extends Control {
             }
         };
 
+        private final EventHandler<KeyEvent> keyPressedEventHandler = new EventHandler<KeyEvent>() {
+            @Override
+            public void handle(KeyEvent t) {
+                key = true;
+                ctrl = t.isControlDown();
+                shift = t.isShiftDown();
+            }
+        };
+        private final EventHandler<MouseEvent> mousePressedEventHandler = new EventHandler<MouseEvent>() {
+            @Override
+            public void handle(MouseEvent t) {
+                key = false;
+                ctrl = t.isControlDown();
+                shift = t.isShiftDown();
+            }
+        };
+        
+        private final EventHandler<MouseEvent> onDragDetectedEventHandler = new EventHandler<MouseEvent>() {
+            @Override
+            public void handle(MouseEvent e) {
+                cellsView.addEventHandler(MouseEvent.MOUSE_RELEASED, dragDoneHandler);
+                drag = true;
+                timer.setCycleCount(Timeline.INDEFINITE);
+                timer.play();
+            }
+        };
+        private final EventHandler<MouseEvent> onMouseDragEventHandler = new EventHandler<MouseEvent>() {
+            @Override
+            public void handle(MouseEvent e) {
+                mouseEvent = e;
+            }
+        };
+        private final ListChangeListener<TablePosition<ObservableList<SpreadsheetCell>, ?>> listChangeListener = new ListChangeListener<TablePosition<ObservableList<SpreadsheetCell>, ?>>() {
+            @Override
+            public void onChanged(
+                    final ListChangeListener.Change<? extends TablePosition<ObservableList<SpreadsheetCell>, ?>> c) {
+                handleSelectedCellsListChangeEvent(c);
+            }
+        };
         /***********************************************************************
          * 
          * Constructors
@@ -1311,48 +1348,16 @@ public class SpreadsheetView extends Control {
         public SpreadsheetViewSelectionModel(SpreadsheetView spreadsheetView) {
             super(spreadsheetView.cellsView);
             final SpreadsheetGridView cellsView = spreadsheetView.cellsView;
-            cellsView.addEventHandler(KeyEvent.KEY_PRESSED, new EventHandler<KeyEvent>() {
-                @Override
-                public void handle(KeyEvent t) {
-                    key = true;
-                    ctrl = t.isControlDown();
-                    shift = t.isShiftDown();
-                }
-            });
+            timer = new Timeline(new KeyFrame(Duration.millis(100), new WeakEventHandler<>((timerEventHandler))));
+            cellsView.addEventHandler(KeyEvent.KEY_PRESSED, new WeakEventHandler<>(keyPressedEventHandler));
 
-            cellsView.setOnMousePressed(new EventHandler<MouseEvent>() {
-                @Override
-                public void handle(MouseEvent t) {
-                    key = false;
-                    ctrl = t.isControlDown();
-                    shift = t.isShiftDown();
-                }
-            });
-            cellsView.setOnDragDetected(new EventHandler<MouseEvent>() {
-                @Override
-                public void handle(MouseEvent e) {
-                    cellsView.addEventHandler(MouseEvent.MOUSE_RELEASED, dragDoneHandler);
-                    drag = true;
-                    timer.setCycleCount(Timeline.INDEFINITE);
-                    timer.play();
-                }
-            });
+            cellsView.setOnMousePressed(new WeakEventHandler<>(mousePressedEventHandler));
+            cellsView.setOnDragDetected(new WeakEventHandler<>(onDragDetectedEventHandler));
 
-            cellsView.setOnMouseDragged(new EventHandler<MouseEvent>() {
-                @Override
-                public void handle(MouseEvent e) {
-                    mouseEvent = e;
-                }
-            });
+            cellsView.setOnMouseDragged(new WeakEventHandler<>(onMouseDragEventHandler));
 
-            selectedCellsMap = new SelectedCellsMap<>(
-                    new ListChangeListener<TablePosition<ObservableList<SpreadsheetCell>, ?>>() {
-                        @Override
-                        public void onChanged(
-                                final Change<? extends TablePosition<ObservableList<SpreadsheetCell>, ?>> c) {
-                            handleSelectedCellsListChangeEvent(c);
-                        }
-                    });
+            selectedCellsMap = new SelectedCellsMap<>(new WeakListChangeListener<>(listChangeListener));
+                    
 
             selectedCellsSeq = new ReadOnlyUnbackedObservableList<TablePosition<ObservableList<SpreadsheetCell>, ?>>() {
                 @Override
@@ -1944,12 +1949,33 @@ public class SpreadsheetView extends Control {
 
         return letter;
     }
-    /*
-     * private EventHandler<GridChange> gridChangeEventHandler = new
-     * EventHandler<GridChange>() {
-     * 
-     * @Override public void handle(GridChange change) {
-     * modifiedCells.add(getGrid
-     * ().getRows().get(change.getRow()).get(change.getColumn())); } };
-     */
+    
+    private final ChangeListener<ContextMenu> contextMenuChangeListener = new ChangeListener<ContextMenu>() {
+        
+        @Override
+        public void changed(ObservableValue<? extends ContextMenu> arg0, ContextMenu oldContextMenu, final ContextMenu newContextMenu) {
+            if(oldContextMenu !=null){
+                oldContextMenu.setOnShowing(null);
+            }
+            if(newContextMenu != null){
+                newContextMenu.setOnShowing(new WeakEventHandler<>(hideContextMenuEventHandler));
+            }
+        }
+    };
+    
+    private final EventHandler<WindowEvent> hideContextMenuEventHandler = new EventHandler<WindowEvent>() {
+        @Override
+        public void handle(WindowEvent arg0) {
+            // We don't want to open a contextMenu when editing
+            // because editors
+            // have their own contextMenu
+            if (getEditingCell() != null) {
+                // We're being reactive but we want to be pro-active
+                // so we may need a work-around.
+                Platform.runLater(()->{
+                    getContextMenu().hide();
+                });
+            }
+        }
+    };
 }

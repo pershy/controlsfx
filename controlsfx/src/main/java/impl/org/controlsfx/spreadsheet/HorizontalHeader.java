@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2013, ControlsFX
+ * Copyright (c) 2013, 2014 ControlsFX
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -48,89 +48,101 @@ import org.controlsfx.control.spreadsheet.SpreadsheetView;
 import com.sun.javafx.scene.control.skin.NestedTableColumnHeader;
 import com.sun.javafx.scene.control.skin.TableColumnHeader;
 import com.sun.javafx.scene.control.skin.TableHeaderRow;
+import javafx.event.WeakEventHandler;
 
 /**
  * The set of horizontal (column) headers.
  */
 public class HorizontalHeader extends TableHeaderRow {
-	final GridViewSkin gridViewSkin;
-	
+
+    final GridViewSkin gridViewSkin;
+
     // Indicate whether the this HorizontalHeader is activated or not
     private boolean working = true;
-    
+
     /***************************************************************************
-     *                                                                         *
-     * Constructor                                                             *
-     *                                                                         *
+     * 
+     * Constructor
+     * 
      **************************************************************************/
     public HorizontalHeader(final GridViewSkin skin) {
         super(skin);
         gridViewSkin = skin;
     }
-    
-    /***************************************************************************
-     *                                                                         *
-     * Public Methods                                                          *
-     *                                                                         *
+
+    /**************************************************************************
+     * 
+     * Public API
+     * 
      **************************************************************************/
-    
     public void init() {
         updateHorizontalHeaderVisibility(gridViewSkin.spreadsheetView.isShowColumnHeader());
-        
-		final SpreadsheetView view = gridViewSkin.spreadsheetView;
-		
-		//Visibility of vertical Header listener
-	    view.showRowHeaderProperty().addListener(verticalHeaderListener);
-	    
-	    //Visibility of horizontal Header listener
-	    view.showColumnHeaderProperty().addListener(horizontalHeaderVisibilityListener);
-	    
-	    //Selection listener to highlight header
-	    gridViewSkin.getSelectedColumns().addListener(selectionListener);
-	    
-	    //Fixed Column listener to change style of header
-	    view.getFixedColumns().addListener(fixedColumnsListener);
-	    
-	   
-		
-		final Runnable r = new Runnable() {
-            @Override
-            public void run() {
-            	 //We are doing that because some columns may be already fixed.
-        		for(SpreadsheetColumn column: view.getFixedColumns()){
-        			fixColumn(column);
-        		}
-            	requestLayout();
-			    /**
-			     * Clicking on header select the cell situated in that column.
-			     * This may be replaced by selecting the entire Column/Row.
-			     */
-			    for (final TableColumnHeader i : getRootHeader().getColumnHeaders()) {
-			        i.getChildrenUnmodifiable().get(0).setOnMousePressed(new EventHandler<MouseEvent>(){
-						@Override
-						public void handle(MouseEvent arg0) {
-							if(arg0.isPrimaryButtonDown()){
-								TableViewSelectionModel<ObservableList<SpreadsheetCell>> sm = gridViewSkin.handle.getView().getSelectionModel();
-								TableViewFocusModel<ObservableList<SpreadsheetCell>> fm = gridViewSkin.handle.getGridView().getFocusModel();
-								sm.clearAndSelect(fm.getFocusedCell().getRow(),i.getTableColumn() );
-							}
-						}
-					});
-			    }
+
+        final SpreadsheetView view = gridViewSkin.spreadsheetView;
+
+        //Visibility of vertical Header listener
+        view.showRowHeaderProperty().addListener(verticalHeaderListener);
+
+        //Visibility of horizontal Header listener
+        view.showColumnHeaderProperty().addListener(horizontalHeaderVisibilityListener);
+
+        //Selection listener to highlight header
+        gridViewSkin.getSelectedColumns().addListener(selectionListener);
+
+        //Fixed Column listener to change style of header
+        view.getFixedColumns().addListener(fixedColumnsListener);
+
+        Platform.runLater(()->{
+             //We are doing that because some columns may be already fixed.
+            for (SpreadsheetColumn column : view.getFixedColumns()) {
+                fixColumn(column);
             }
-        };
-        Platform.runLater(r);
+            requestLayout();
+            /**
+             * Clicking on header select the cell situated in that column.
+             * This may be replaced by selecting the entire Column/Row.
+             */
+            for (final TableColumnHeader i : getRootHeader().getColumnHeaders()) {
+                EventHandler<MouseEvent> mouseEventHandler = new EventHandler<MouseEvent>() {
+                    @Override
+                    public void handle(MouseEvent arg0) {
+                        if (arg0.isPrimaryButtonDown()) {
+                            TableViewSelectionModel<ObservableList<SpreadsheetCell>> sm = gridViewSkin.handle.getView().getSelectionModel();
+                            TableViewFocusModel<ObservableList<SpreadsheetCell>> fm = gridViewSkin.handle.getGridView().getFocusModel();
+                            sm.clearAndSelect(fm.getFocusedCell().getRow(), i.getTableColumn());
+                        }
+                    }
+                };
+                i.getChildrenUnmodifiable().get(0).setOnMousePressed(new WeakEventHandler<>(mouseEventHandler));
+            }
+        });
+        
+        /**
+         * When we are setting a new Grid (model) on the SpreadsheetView, it 
+         * appears that the headers are re-created. So we need to listen to 
+         * those changes in order to re-apply our css style class. Otherwise
+         * we'll end up with fixedColumns but no graphic confirmation.
+         */
+        getRootHeader().getColumnHeaders().addListener(new InvalidationListener() {
+            @Override
+            public void invalidated(Observable o) {
+               for (SpreadsheetColumn fixItem : gridViewSkin.spreadsheetView.getFixedColumns()) {
+                   fixColumn(fixItem);
+               }
+               updateHighlightSelection();
+            }
+        });
 
     }
-    
+
     @Override
     public HorizontalHeaderColumn getRootHeader() {
         return (HorizontalHeaderColumn) super.getRootHeader();
     }
 
-    /***************************************************************************
+    /**************************************************************************
      * 
-     * Protected Methods 
+     * Protected methods
      * 
      **************************************************************************/
     @Override
@@ -164,88 +176,95 @@ public class HorizontalHeader extends TableHeaderRow {
         return new HorizontalHeaderColumn(getTableSkin(), null);
     }
 
-    /***************************************************************************
+    /**************************************************************************
      * 
-     * Private Methods 
+     * Private methods.
      * 
      **************************************************************************/
-    
     /**
-     *Whether the Vertical Header is showing, we need to update the width because some
-     *space on the left will be available/used.
+     * Whether the Vertical Header is showing, we need to update the width
+     * because some space on the left will be available/used.
      */
     private final ChangeListener<Boolean> verticalHeaderListener = new ChangeListener<Boolean>() {
-		@Override
-		public void changed(ObservableValue<? extends Boolean> arg0, Boolean arg1, Boolean arg2) {
-			 updateTableWidth();
-		}
+        @Override
+        public void changed(ObservableValue<? extends Boolean> arg0, Boolean arg1, Boolean arg2) {
+            updateTableWidth();
+        }
     };
-    
+
     /**
-     * Whether the Horizontal Header is showing, we need to toggle its visibility.
+     * Whether the Horizontal Header is showing, we need to toggle its
+     * visibility.
      */
     private final ChangeListener<Boolean> horizontalHeaderVisibilityListener = new ChangeListener<Boolean>() {
         @Override
-        public void changed(ObservableValue<? extends Boolean> arg0,Boolean arg1, Boolean arg2) {
-        	updateHorizontalHeaderVisibility(arg2);
+        public void changed(ObservableValue<? extends Boolean> arg0, Boolean arg1, Boolean arg2) {
+            updateHorizontalHeaderVisibility(arg2);
         }
     };
-    
+
     /**
-     * When we fix/unfix some columns, we change the style of the Label header text
+     * When we fix/unfix some columns, we change the style of the Label header
+     * text
      */
     private final ListChangeListener<SpreadsheetColumn> fixedColumnsListener = new ListChangeListener<SpreadsheetColumn>() {
 
-		@Override
-		public void onChanged(
-				javafx.collections.ListChangeListener.Change<? extends SpreadsheetColumn> arg0) {
-			while(arg0.next()){
-				//If we unfix a column
-				for (SpreadsheetColumn remitem : arg0.getRemoved()) {
-                  unfixColumn(remitem);
-                }
-				//If we fix one
-                for (SpreadsheetColumn additem : arg0.getAddedSubList()) {
-                	fixColumn(additem);
-                }
-			}
-			 updateHighlightSelection();
-		}
-	}; 
+        @Override
+        public void onChanged(javafx.collections.ListChangeListener.Change<? extends SpreadsheetColumn> change) {
+            while (change.next()) {
+               //If we unfix a column
+               for (SpreadsheetColumn remitem : change.getRemoved()) {
+                   unfixColumn(remitem);
+               }
+               //If we fix one
+               for (SpreadsheetColumn additem : change.getAddedSubList()) {
+                   fixColumn(additem);
+               }
+            }
+            updateHighlightSelection();
+        }
+    };
 
-	/**
-	 * Fix this column regarding the style
-	 * @param column
-	 */
-	private void fixColumn(SpreadsheetColumn column){
-		addStyleHeader(gridViewSkin.spreadsheetView.getColumns().indexOf(column));
-//		column.setText(column.getText().replace(".", "")+":");
-	}
-	
-	/**
-	 * Unfix this column regarding the style
-	 * @param column
-	 */
-	private void unfixColumn(SpreadsheetColumn column){
-		 removeStyleHeader(gridViewSkin.spreadsheetView.getColumns().indexOf(column));
-//		 column.setText(column.getText().replace(":", "."));
-	}
-	/**
-	 * Add the fix style of the header Label of the specified column
-	 * @param i
-	 */
-	private void removeStyleHeader(Integer i) {
-        	getRootHeader().getColumnHeaders().get(i).getStyleClass().removeAll("fixed");
+    /**
+     * Fix this column regarding the style
+     *
+     * @param column
+     */
+    private void fixColumn(SpreadsheetColumn column) {
+        addStyleHeader(gridViewSkin.spreadsheetView.getColumns().indexOf(column));
     }
-	/**
-	 * Remove the fix style of the header Label of the specified column
-	 * @param i
-	 */
-	private void addStyleHeader(Integer i) {
-            getRootHeader().getColumnHeaders().get((Integer) i).getStyleClass()
-                    .addAll("fixed");
+
+    /**
+     * Unfix this column regarding the style
+     *
+     * @param column
+     */
+    private void unfixColumn(SpreadsheetColumn column) {
+        removeStyleHeader(gridViewSkin.spreadsheetView.getColumns().indexOf(column));
     }
-    
+
+    /**
+     * Add the fix style of the header Label of the specified column
+     *
+     * @param i
+     */
+    private void removeStyleHeader(Integer i) {
+        if (getRootHeader().getColumnHeaders().size() > i) {
+            getRootHeader().getColumnHeaders().get(i).getStyleClass().removeAll("fixed"); //$NON-NLS-1$
+        }
+    }
+
+    /**
+     * Remove the fix style of the header Label of the specified column
+     *
+     * @param i
+     */
+    private void addStyleHeader(Integer i) {
+        if (getRootHeader().getColumnHeaders().size() > i) {
+            getRootHeader().getColumnHeaders().get(i).getStyleClass().addAll("fixed"); //$NON-NLS-1$
+        }
+    }
+
     /**
      * When we select some cells, we want the header to be highlighted
      */
@@ -255,30 +274,32 @@ public class HorizontalHeader extends TableHeaderRow {
             updateHighlightSelection();
         }
     };
-    
+
     /**
      * Highlight the header Label when selection change.
      */
     private void updateHighlightSelection() {
-    	for (final TableColumnHeader i : getRootHeader().getColumnHeaders()) {
-            i.getStyleClass().removeAll("selected");
+        for (final TableColumnHeader i : getRootHeader().getColumnHeaders()) {
+            i.getStyleClass().removeAll("selected"); //$NON-NLS-1$
 
         }
         final List<Integer> selectedColumns = gridViewSkin.getSelectedColumns();
-        for (final Object i : selectedColumns) {
-            getRootHeader().getColumnHeaders().get((Integer) i).getStyleClass()
-                    .addAll("selected");
+        for (final Integer i : selectedColumns) {
+            if (getRootHeader().getColumnHeaders().size() > i) {
+                getRootHeader().getColumnHeaders().get(i).getStyleClass()
+                        .addAll("selected"); //$NON-NLS-1$
+            }
         }
 
     }
-    
-    private void updateHorizontalHeaderVisibility(boolean visible){
+
+    private void updateHorizontalHeaderVisibility(boolean visible) {
         working = visible;
         setManaged(working);
-        if(!visible){
-            getStyleClass().add("invisible");
-        }else{
-            getStyleClass().remove("invisible");
+        if (!visible) {
+            getStyleClass().add("invisible"); //$NON-NLS-1$
+        } else {
+            getStyleClass().remove("invisible"); //$NON-NLS-1$
             requestLayout();
             getRootHeader().layoutFixedColumns();
             updateHighlightSelection();

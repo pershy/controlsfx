@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2013, ControlsFX
+ * Copyright (c) 2013, 2014 ControlsFX
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -26,13 +26,17 @@
  */
 package impl.org.controlsfx.spreadsheet;
 
+import java.util.Optional;
 import javafx.application.Platform;
 import javafx.beans.binding.When;
 import javafx.beans.value.ChangeListener;
 import javafx.beans.value.ObservableValue;
+import javafx.beans.value.WeakChangeListener;
 import javafx.collections.ObservableList;
 import javafx.collections.SetChangeListener;
+import javafx.collections.WeakSetChangeListener;
 import javafx.event.EventHandler;
+import javafx.event.WeakEventHandler;
 import javafx.scene.Node;
 import javafx.scene.control.ContentDisplay;
 import javafx.scene.control.Control;
@@ -63,8 +67,9 @@ public class CellView extends TableCell<ObservableList<SpreadsheetCell>, Spreads
     /***************************************************************************
      * * Static Fields * *
      **************************************************************************/
-    private static final String ANCHOR_PROPERTY_KEY = "table.anchor";
+    private static final String ANCHOR_PROPERTY_KEY = "table.anchor"; //$NON-NLS-1$
     private static final int TOOLTIP_MAX_WIDTH = 400;
+    private static final int WRAP_HEIGHT = 35;
 
     static TablePositionBase<?> getAnchor(Control table, TablePositionBase<?> focusedCell) {
         return hasAnchor(table) ? (TablePositionBase<?>) table.getProperties().get(ANCHOR_PROPERTY_KEY) : focusedCell;
@@ -79,59 +84,15 @@ public class CellView extends TableCell<ObservableList<SpreadsheetCell>, Spreads
      **************************************************************************/
     public CellView(SpreadsheetHandle handle) {
         this.handle = handle;
-        hoverProperty().addListener(new ChangeListener<Boolean>() {
-            @Override
-            public void changed(ObservableValue<? extends Boolean> ov, Boolean t, Boolean t1) {
-                final int row = getIndex();
-                if (getItem() == null) {
-                    getTableRow().requestLayout();
-                    // We only need to re-route if the rowSpan is large because
-                    // it's the only case where it's not handled correctly.
-                } else if (getItem().getRowSpan() > 1) {
-                    // If we are not at the top of the Spanned Cell
-                    if (t1 && row != getItem().getRow()) {
-                        hoverGridCell(getItem());
-                    } else if (!t1 && row != getItem().getRow()) {
-                        unHoverGridCell();
-                    }
-                }
-            }
-        });
+        hoverProperty().addListener(hoverChangeListener);
         // When we detect a drag, we start the Full Drag so that other event
         // will be fired
-        this.addEventHandler(MouseEvent.DRAG_DETECTED, new EventHandler<MouseEvent>() {
-            @Override
-            public void handle(MouseEvent arg0) {
-                startFullDrag();
-            }
-        });
+        this.addEventHandler(MouseEvent.DRAG_DETECTED, new WeakEventHandler<>(startFullDragEventHandler));
 
-        setOnMouseDragEntered(new EventHandler<MouseEvent>() {
-            @Override
-            public void handle(MouseEvent arg0) {
-                dragSelect(arg0);
-            }
-        });
-        this.itemProperty().addListener(new ChangeListener<SpreadsheetCell>() {
-
-            @Override
-            public void changed(ObservableValue<? extends SpreadsheetCell> arg0, SpreadsheetCell oldItem,
-                    SpreadsheetCell newItem) {
-                if (oldItem != null) {
-                    oldItem.getStyleClass().removeListener(styleClassListener);
-                    oldItem.graphicProperty().removeListener(graphicListener);
-                }
-                if (newItem != null) {
-                    getStyleClass().clear();
-                    getStyleClass().setAll(newItem.getStyleClass());
-
-                    newItem.getStyleClass().addListener(styleClassListener);
-                    setCellGraphic(newItem);
-                    newItem.graphicProperty().addListener(graphicListener);
-                }
-            }
-        });
-
+        setOnMouseDragEntered(new WeakEventHandler<>(dragMouseEventHandler));
+        
+        itemProperty().addListener(itemChangeListener);
+        heightProperty().addListener(wrapHeightChangeListener);
     }
 
     /***************************************************************************
@@ -243,22 +204,24 @@ public class CellView extends TableCell<ObservableList<SpreadsheetCell>, Spreads
         }
     }
 
-    @Override
-    public String toString() {
-        return getItem().getRow() + "/" + getItem().getColumn();
-
-    }
+//    @Override
+//    public String toString() {
+//        //FIXME
+//        return getItem().getRow() + "/" + getItem().getColumn(); //$NON-NLS-1$
+//
+//    }
 
     /**
      * Called in the gridRowSkinBase when doing layout This allow not to
      * override opacity in the row and let the cell handle itself
+     * @param item
      */
     public void show(final SpreadsheetCell item) {
         // We reset the settings
         textProperty().bind(item.textProperty());
         setCellGraphic(item);
 
-        if (item.getItem() == null || item.getItem().equals("")
+        if (item.getItem() == null || item.getItem().equals("") //$NON-NLS-1$
                 || (item.getItem() instanceof Double && Double.isNaN((double) item.getItem()))) {
             setTooltip(null);
         } else {
@@ -267,19 +230,16 @@ public class CellView extends TableCell<ObservableList<SpreadsheetCell>, Spreads
              * because an exception can be thrown otherwise. This should use
              * Lambda expression but I cannot use 1.8 compliance..
              */
-            getValue(new Runnable() {
-                @Override
-                public void run() {
+            getValue(()->{
                     Tooltip toolTip = new Tooltip(item.getItem().toString());
                     toolTip.setWrapText(true);
                     toolTip.setMaxWidth(TOOLTIP_MAX_WIDTH);
                     setTooltip(toolTip);
                 }
-            });
+            );
         }
-
         // We want the text to wrap onto another line
-        setWrapText(true);
+//        setWrapText(true);
         setEditable(item.isEditable());
     }
 
@@ -293,6 +253,26 @@ public class CellView extends TableCell<ObservableList<SpreadsheetCell>, Spreads
      * * Private Methods * *
      **************************************************************************/
 
+    /**
+     * FIXME
+     * We got a problem right now with wrapping values because if the height of the row is
+     * too small for the text, it is not rendered. And this bug is not happening when we set
+     * the wrap property to false.
+     * 
+     * So this is a work-around in order to set the wrap property only if this has a bit of sense,
+     * aka, the height could allow a second line.
+     */
+     private final ChangeListener<Number> wrapHeightChangeListener = new ChangeListener<Number>() {
+
+        @Override
+        public void changed(ObservableValue<? extends Number> ov, Number t, Number t1) {
+            if (t1.doubleValue() > WRAP_HEIGHT) {
+                setWrapText(true);
+            } else {
+                setWrapText(false);
+            }
+        }
+    };
     private void setCellGraphic(SpreadsheetCell item) {
 
         if (isEditing()) {
@@ -346,16 +326,20 @@ public class CellView extends TableCell<ObservableList<SpreadsheetCell>, Spreads
      */
     private GridCellEditor getEditor(final SpreadsheetCell cell, final SpreadsheetView spv) {
         SpreadsheetCellType<?> cellType = cell.getCellType();
-        SpreadsheetCellEditor cellEditor = spv.getEditor(cellType);
+        Optional<SpreadsheetCellEditor> cellEditor = spv.getEditor(cellType);
 
-        GridCellEditor editor = handle.getCellsViewSkin().getSpreadsheetCellEditorImpl();
-        if (editor.isEditing()) {
+        if(cellEditor.isPresent()){
+            GridCellEditor editor = handle.getCellsViewSkin().getSpreadsheetCellEditorImpl();
+            if (editor.isEditing()) {
+                return null;
+            } else {
+                editor.updateSpreadsheetCell(this);
+                editor.updateDataCell(cell);
+                editor.updateSpreadsheetCellEditor(cellEditor.get());
+                return editor;
+            }
+        }else{
             return null;
-        } else {
-            editor.updateSpreadsheetCell(this);
-            editor.updateDataCell(cell);
-            editor.updateSpreadsheetCellEditor(cellEditor);
-            return editor;
         }
     }
 
@@ -408,14 +392,16 @@ public class CellView extends TableCell<ObservableList<SpreadsheetCell>, Spreads
         }
     }
 
-    private ChangeListener<Node> graphicListener = new ChangeListener<Node>() {
+    private final ChangeListener<Node> graphicListener = new ChangeListener<Node>() {
         @Override
         public void changed(ObservableValue<? extends Node> arg0, Node arg1, Node newGraphic) {
             setCellGraphic(getItem());
         }
     };
 
-    private SetChangeListener<String> styleClassListener = new SetChangeListener<String>() {
+    private final WeakChangeListener<Node> weakGraphicListener = new WeakChangeListener<>(graphicListener);
+    
+    private final SetChangeListener<String> styleClassListener = new SetChangeListener<String>() {
         @Override
         public void onChanged(javafx.collections.SetChangeListener.Change<? extends String> arg0) {
             if (arg0.wasAdded()) {
@@ -425,7 +411,9 @@ public class CellView extends TableCell<ObservableList<SpreadsheetCell>, Spreads
             }
         }
     };
-
+    
+    private final WeakSetChangeListener<String> weakStyleClassListener = new WeakSetChangeListener<>(styleClassListener);
+    
     /**
      * Method that will select all the cells between the drag place and that
      * cell.
@@ -519,5 +507,57 @@ public class CellView extends TableCell<ObservableList<SpreadsheetCell>, Spreads
     @Override
     protected javafx.scene.control.Skin<?> createDefaultSkin() {
         return new CellViewSkin(this);
+    };
+    
+    private final EventHandler<MouseEvent> startFullDragEventHandler = new EventHandler<MouseEvent>() {
+        @Override
+        public void handle(MouseEvent arg0) {
+            startFullDrag();
+        }
+    };
+    
+    private final EventHandler<MouseEvent> dragMouseEventHandler = new EventHandler<MouseEvent>() {
+        @Override
+        public void handle(MouseEvent arg0) {
+            dragSelect(arg0);
+        }
+    };
+    
+    private final ChangeListener<Boolean> hoverChangeListener = new ChangeListener<Boolean>() {
+        @Override
+        public void changed(ObservableValue<? extends Boolean> ov, Boolean t, Boolean t1) {
+            final int row = getIndex();
+            if (getItem() == null) {
+                getTableRow().requestLayout();
+                // We only need to re-route if the rowSpan is large because
+                // it's the only case where it's not handled correctly.
+            } else if (getItem().getRowSpan() > 1) {
+                // If we are not at the top of the Spanned Cell
+                if (t1 && row != getItem().getRow()) {
+                    hoverGridCell(getItem());
+                } else if (!t1 && row != getItem().getRow()) {
+                    unHoverGridCell();
+                }
+            }
+        }
+    };
+    private final ChangeListener<SpreadsheetCell> itemChangeListener = new ChangeListener<SpreadsheetCell>() {
+
+        @Override
+        public void changed(ObservableValue<? extends SpreadsheetCell> arg0, SpreadsheetCell oldItem,
+                SpreadsheetCell newItem) {
+            if (oldItem != null) {
+                oldItem.getStyleClass().removeListener(weakStyleClassListener);
+                oldItem.graphicProperty().removeListener(weakGraphicListener);
+            }
+            if (newItem != null) {
+                getStyleClass().clear();
+                getStyleClass().setAll(newItem.getStyleClass());
+
+                newItem.getStyleClass().addListener(weakStyleClassListener);
+                setCellGraphic(newItem);
+                newItem.graphicProperty().addListener(weakGraphicListener);
+            }
+        }
     };
 }

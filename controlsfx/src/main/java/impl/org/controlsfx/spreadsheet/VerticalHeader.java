@@ -73,7 +73,7 @@ public class VerticalHeader extends StackPane {
     private final SpreadsheetHandle handle;
     private final SpreadsheetView spreadsheetView;
     private double horizontalHeaderHeight;
-    private DoubleProperty verticalHeaderWidth;
+    private final DoubleProperty verticalHeaderWidth;
     private Double savedWidth;
     private boolean working = true; // Whether or not we are showing the
                                     // verticalHeader
@@ -85,9 +85,9 @@ public class VerticalHeader extends StackPane {
     private static double dragAnchorY = 0.0;
 
     // drag rectangle overlays
-    private List<Rectangle> dragRects = new ArrayList<Rectangle>();
+    private final List<Rectangle> dragRects = new ArrayList<>();
 
-    private List<Label> labelList = new ArrayList<Label>();
+    private final List<Label> labelList = new ArrayList<>();
     GridViewSkin skin;
     private boolean resizing = false;
 
@@ -216,22 +216,11 @@ public class VerticalHeader extends StackPane {
             // We iterate over the visibleRows
             while (cellSize != 0 && row != null && row.getIndex() < modelRowCount) {
                 rowIndex = row.getIndex();
-                // row = skin.getRow(i);
                 label = getLabel(rowCount);
-                // label.minHeightProperty().bind(row.minHeightProperty());
                 getChildren().add(label);
-                // label.textProperty().bind(row.indexProperty().asString());
-                if (spreadsheetView.getFixedRows().contains(rowIndex)) {
-                    label.setText(getRowHeader(rowIndex) + ":");
-                } else if (spreadsheetView.isRowFixable(row.getIndex())) {
-                    label.setText(getRowHeader(rowIndex) + ".");
-                } else {
-                    label.setText(getRowHeader(rowIndex) + " ");
-                }
-                // label.setPrefWidth(verticalHeaderWidth.get());
+                label.setText(getRowHeader(rowIndex));
                 label.resize(verticalHeaderWidth.get(), row.getHeight());
                 label.layoutYProperty().bind(row.layoutYProperty().add(horizontalHeaderHeight));
-                // label.relocate(x, y);
                 label.setContextMenu(getRowContextMenu(rowIndex));
 
                 // We want to highlight selected rows
@@ -247,7 +236,6 @@ public class VerticalHeader extends StackPane {
                     css.removeAll("fixed");
                 }
 
-                // ++i;
                 y += row.getHeight();
 
                 // position drag overlay to intercept column resize requests
@@ -271,7 +259,7 @@ public class VerticalHeader extends StackPane {
                         break;
                     label = getLabel(rowCount++);
 
-                    label.setText(getRowHeader(rowIndex) + ":");
+                    label.setText(getRowHeader(rowIndex));
                     label.resize(verticalHeaderWidth.get(), skin.getRowHeight(rowIndex));
                     label.setContextMenu(getRowContextMenu(rowIndex));
                     label.layoutYProperty().unbind();
@@ -291,16 +279,7 @@ public class VerticalHeader extends StackPane {
                     
                     spaceUsedByFixedRows += skin.getRowHeight(rowIndex);
 
-//                    y += skin.getRowHeight(rowIndex);
-
-//                    Rectangle dragRect = getDragRect(rowCount++);
-//                    dragRect.getProperties().put(TABLE_ROW_KEY, row);
-//                    dragRect.getProperties().put(TABLE_LABEL_KEY, label);
-//                    dragRect.setWidth(label.getWidth());
-//                    dragRect.relocate(snappedLeftInset() + x, y - DRAG_RECT_HEIGHT);
                     getChildren().add(label);
-//                    getChildren().add(dragRect);
-
                 }
             }
 
@@ -328,11 +307,6 @@ public class VerticalHeader extends StackPane {
                 label.setContextMenu(blankContextMenu);
                 getChildren().add(label);
             }
-            // Flush the rest of the children if any
-            // while (getChildren().size() > rowCount) {
-            // getChildren().remove(rowCount);
-            // }
-            // getChildren().addAll(dragRects);
         } else {
             getChildren().clear();
         }
@@ -367,7 +341,6 @@ public class VerticalHeader extends StackPane {
     private void columnResizing(GridRow gridRow, Label label, MouseEvent me) {
         double draggedY = me.getSceneY() - dragAnchorY;
         if (gridRow.getEffectiveNodeOrientation() == NodeOrientation.RIGHT_TO_LEFT) {
-            System.out.println("ici");
             draggedY = -draggedY;
         }
         

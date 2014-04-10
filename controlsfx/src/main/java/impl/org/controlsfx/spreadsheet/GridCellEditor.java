@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2013, ControlsFX
+ * Copyright (c) 2013, 2014 ControlsFX
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -28,9 +28,15 @@ package impl.org.controlsfx.spreadsheet;
 
 import javafx.beans.InvalidationListener;
 import javafx.beans.Observable;
+import javafx.collections.ObservableList;
+import javafx.event.EventHandler;
+import javafx.scene.control.TablePosition;
+import javafx.scene.input.KeyCode;
+import javafx.scene.input.KeyEvent;
 
 import org.controlsfx.control.spreadsheet.SpreadsheetCell;
 import org.controlsfx.control.spreadsheet.SpreadsheetCellEditor;
+import org.controlsfx.control.spreadsheet.SpreadsheetCellType;
 import org.controlsfx.control.spreadsheet.SpreadsheetView;
 
 public class GridCellEditor {
@@ -45,13 +51,16 @@ public class GridCellEditor {
     private SpreadsheetCell modelCell;
     private CellView viewCell;
 
-    // private internal fields
-    private SpreadsheetEditor spreadsheetEditor;
-    private InvalidationListener editorListener;
-    private InvalidationListener il;
+    // The SpreadsheetEditor in order to position the cell for edition.
+    private final SpreadsheetEditor spreadsheetEditor;
     private boolean editing = false;
+    
+    //The cell's editor 
     private SpreadsheetCellEditor spreadsheetCellEditor;
     private CellView lastHover = null;
+    
+    //The last key pressed in order to select cell below if it was "enter"
+    private KeyCode lastKeyPressed;
     private static final double MAX_EDITOR_HEIGHT = 50.0;
 
     /***************************************************************************
@@ -90,10 +99,10 @@ public class GridCellEditor {
     /**
      * Update the SpreadsheetCellEditor
      * 
-     * @param spreadsheetCellEditor2
+     * @param spreadsheetCellEditor
      */
-    public void updateSpreadsheetCellEditor(final SpreadsheetCellEditor spreadsheetCellEditor2) {
-        this.spreadsheetCellEditor = spreadsheetCellEditor2;
+    public void updateSpreadsheetCellEditor(final SpreadsheetCellEditor spreadsheetCellEditor) {
+        this.spreadsheetCellEditor = spreadsheetCellEditor;
     }
 
     public CellView getLastHover() {
@@ -106,18 +115,18 @@ public class GridCellEditor {
 
     /**
      * Whenever you want to stop the edition, you call that method.<br/>
-     * True means you're trying to commit the value, then
-     * {@link #validateEdit()} will be called in order to verify that the value
-     * is correct.<br/>
+     * True means you're trying to commit the value, then 
+     * {@link SpreadsheetCellType#match(java.lang.Object) } will be called 
+     * in order to verify that the value is correct.<br/>
+     * 
      * False means you're trying to cancel the value and it will be follow by
      * {@link #end()}.<br/>
      * See SpreadsheetCellEditor description
      * 
-     * @param b
-     *            true means commit, false means cancel
+     * @param commitValue true means commit, false means cancel
      */
-    public void endEdit(boolean b) {
-        if (b) {
+    public void endEdit(boolean commitValue) {
+        if (commitValue && editing) {
             final SpreadsheetView view = handle.getView();
             boolean match = modelCell.getCellType().match(spreadsheetCellEditor.getControlValue());
 
@@ -126,12 +135,23 @@ public class GridCellEditor {
 
                 // We update the value
                 view.getGrid().setCellValue(modelCell.getRow(), modelCell.getColumn(), value);
+                editing = false;
                 viewCell.commitEdit(modelCell);
                 end();
                 spreadsheetCellEditor.end();
+                
+                //We select the cell below if "enter" was typed.
+                if(lastKeyPressed == KeyCode.ENTER){
+                   TablePosition<ObservableList<SpreadsheetCell>, ?> position = (TablePosition<ObservableList<SpreadsheetCell>, ?>) handle.getGridView().
+                            getFocusModel().getFocusedCell();
+                    if (position != null) {
+                        handle.getGridView().getSelectionModel().clearAndSelect(position.getRow() + 1, position.getTableColumn());
+                    }
+                }
             }
         }
-        if (viewCell != null) {
+        if (viewCell != null && editing) {
+            editing = false;
             viewCell.cancelEdit();
             end();
             spreadsheetCellEditor.end();
@@ -156,35 +176,13 @@ public class GridCellEditor {
      **************************************************************************/
     void startEdit() {
         editing = true;
+        
+        handle.getGridView().addEventFilter(KeyEvent.KEY_PRESSED, enterKeyPressed);
         spreadsheetEditor.startEdit();
 
-        // If the SpreadsheetCell is deselected, we commit.
-        // Sometimes, when you you touch the scrollBar when editing,
-        // this is called way
-        // too late and the SpreadsheetCell is null, so we need to be
-        // careful.
-        il = new InvalidationListener() {
-            @Override
-            public void invalidated(Observable observable) {
-                endEdit(true);
-            }
-        };
-
-        viewCell.selectedProperty().addListener(il);
-
-        // In ANY case, we stop when something move in scrollBar Vertical
-        editorListener = new InvalidationListener() {
-            @Override
-            public void invalidated(Observable arg0) {
-                endEdit(true);
-            }
-        };
-        handle.getCellsViewSkin().getVBar().valueProperty().addListener(editorListener);
-        // FIXME We need to REALLY find a way to stop edition when anything
-        // happen
-        // This is one way but it will need further investigation
-        handle.getView().disabledProperty().addListener(editorListener);
-
+        handle.getCellsViewSkin().getVBar().valueProperty().addListener(endEditionListener);
+        handle.getCellsViewSkin().getHBar().valueProperty().addListener(endEditionListener);
+        
         viewCell.setGraphic(spreadsheetCellEditor.getEditor());
 
         // Then we call the user editor in order for it to be ready
@@ -192,30 +190,54 @@ public class GridCellEditor {
         Double maxHeight = Math.max(handle.getCellsViewSkin().getRowHeight(viewCell.getIndex()), MAX_EDITOR_HEIGHT);
         spreadsheetCellEditor.getEditor().setMaxHeight(maxHeight);
         spreadsheetCellEditor.getEditor().setPrefWidth(viewCell.getWidth());
-        spreadsheetCellEditor.startEdit(value);
+        
+        if(handle.getGridView().getEditWithKey()){
+            handle.getGridView().setEditWithKey(false);
+            spreadsheetCellEditor.startEdit("");
+        }else{
+            spreadsheetCellEditor.startEdit(value);
+        }
+        
+        spreadsheetCellEditor.getEditor().focusedProperty().addListener(endEditionListener);
     }
 
     private void end() {
-        editing = false;
         spreadsheetEditor.end();
-        if (viewCell != null) {
-            viewCell.selectedProperty().removeListener(il);
-        }
-        il = null;
-        /**
-         * editorListener is never supposed to be null here. But if several
-         * events are fired by mistake, we should just let it go smootly instead
-         * of throwing exceptions.
-         */
-        if (editorListener != null) {
-            handle.getCellsViewSkin().getVBar().valueProperty().removeListener(editorListener);
-            handle.getView().disabledProperty().removeListener(editorListener);
-        }
-        editorListener = null;
+        spreadsheetCellEditor.getEditor().focusedProperty().removeListener(endEditionListener);
+        handle.getCellsViewSkin().getVBar().valueProperty().removeListener(endEditionListener);
+        handle.getCellsViewSkin().getHBar().valueProperty().removeListener(endEditionListener);
+        
+        handle.getGridView().removeEventFilter(KeyEvent.KEY_PRESSED, enterKeyPressed);
+
         this.modelCell = null;
         this.viewCell = null;
     }
 
+    /**
+     * When we stop editing a cell, if enter was pressed, we want to go to the next line.
+     */
+    private final EventHandler<KeyEvent> enterKeyPressed = new EventHandler<KeyEvent>() {
+        @Override
+        public void handle(KeyEvent t) {
+            lastKeyPressed = t.getCode();
+        }
+    };
+    
+    private final InvalidationListener endEditionListener = new InvalidationListener() {
+        @Override
+        public void invalidated(Observable observable) {
+            endEdit(true);
+        }
+    };
+     
+    /**
+     * This editor is here to ensure that the cell editor 
+     * ({@link SpreadsheetCellEditor}) will always be displayed on top of every
+     * other Node. 
+     * 
+     * To ensure this, we must be sure that our cell is added to the last row
+     * so that it will not be covered by other node.
+     */
     private class SpreadsheetEditor {
 
         /***********************************************************************

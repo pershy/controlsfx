@@ -57,7 +57,7 @@ public class ImageGridCell extends GridCell<Image> {
      * @param preserveImageProperties if set to true will preserve image aspect ratio and smoothness
      */
 	public ImageGridCell( boolean preserveImageProperties ) {
-		getStyleClass().add("image-grid-cell");
+		getStyleClass().add("image-grid-cell"); //$NON-NLS-1$
 		
 		this.preserveImageProperties = preserveImageProperties;
 		imageView = new ImageView();
@@ -70,8 +70,6 @@ public class ImageGridCell extends GridCell<Image> {
 	 */
 	@Override protected void updateItem(Image item, boolean empty) {
 	    super.updateItem(item, empty);
-	    
-	    getChildren().clear();
 	    
 	    if (empty) {
 	        setGraphic(null);

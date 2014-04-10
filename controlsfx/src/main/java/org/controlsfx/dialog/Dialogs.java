@@ -70,10 +70,12 @@ import javafx.scene.control.ListCell;
 import javafx.scene.control.ListView;
 import javafx.scene.control.PasswordField;
 import javafx.scene.control.ProgressBar;
+import javafx.scene.control.SelectionModel;
 import javafx.scene.control.Tab;
 import javafx.scene.control.TabPane;
 import javafx.scene.control.TextArea;
 import javafx.scene.control.TextField;
+import javafx.scene.effect.Effect;
 import javafx.scene.image.Image;
 import javafx.scene.image.ImageView;
 import javafx.scene.layout.ColumnConstraints;
@@ -289,6 +291,21 @@ import org.controlsfx.dialog.Dialog.Actions;
  * <br>
  * <center><img src="lightweight.png"></center>
  * 
+ * <h3>Java 8 API elements</h3>
+ * 
+ * <p>Many methods in this class are taking advantage of {@link Optional}. There are many benefits of this, but the main one 
+ * is that there no more checking for null and thus no possibility of NullPointerExceptions. Here some things you can do with
+ * {@link Optional}s: <br>
+ *  
+ * <pre>{@code 
+ *   optional.isPresent(value->{...}) //perform an operation only if there is a value 
+ *   optional.orElse(default)         //get the value of optional with default if it does not exists
+ *   optional.map( value -> {...} ).orElse(default) //convert to other type with default
+ * </pre>
+ * and many more - check {@link Optional} API.<br>
+ * {@link Optional} can be thought of as a stream collection of one or none elements, allowing for functional approach - 
+ * chaining methods without keeping state. This especially beneficial in concurrent environments.  
+ * 
  * <h3>Code Examples</h3>
  * 
  * <p>The code below will setup and show a confirmation dialog:
@@ -340,6 +357,7 @@ import org.controlsfx.dialog.Dialog.Actions;
  * @see Action
  * @see Actions
  * @see AbstractAction
+ * @see Optional
  */
 public final class Dialogs {
 
@@ -357,6 +375,7 @@ public final class Dialogs {
     private boolean lightweight;
     private boolean nativeTitleBar;
     private Set<Action> actions = new LinkedHashSet<>();
+    private Effect backgroundEffect;
 
     /**
      * Creates the initial dialog
@@ -430,6 +449,19 @@ public final class Dialogs {
      */
     public Dialogs actions( Action... actions) {
         return actions( Arrays.asList(actions));
+    }
+    
+    /**
+     * Sets the effect which should be applied to background components when dialog appears.
+     * If not set or set to null, default semi-transparent panel will be used
+     * Good example of effect to use is GaussianBlur 
+     * Currently works only with lightweight dialogs.
+     * @param effect to be applied
+     * @return dialog instance
+     */
+    public Dialogs backgroundEffect(Effect effect) {
+        this.backgroundEffect = effect;
+        return this;
     }
     
     /**
@@ -532,21 +564,21 @@ public final class Dialogs {
     /**
      * Shows dialog with one text field
      * @param defaultValue text field default value 
-     * @return text from input field if OK action is used otherwise null 
+     * @return Optional of text from input field if OK action is used otherwise Optional.EMPTY 
      */
-    public String showTextInput(String defaultValue) {
+    public Optional<String> showTextInput(String defaultValue) {
         Dialog dlg = buildDialog(Type.INPUT);
         final TextField textField = new TextField(defaultValue);
         dlg.setContent(buildInputContent(textField));
         
-        return dlg.show() == OK ? textField.getText() : null;
+        return Optional.ofNullable( dlg.show() == OK ? textField.getText() : null );
     }
 
     /**
      * Shows dialog with one text field 
-     * @return text from input field or null if dialog is cancelled 
+     * @return Optional of text from input field or Optional.EMPTY if dialog is cancelled 
      */
-    public String showTextInput() {
+    public Optional<String> showTextInput() {
         return showTextInput("");
     }
 
@@ -555,57 +587,54 @@ public final class Dialogs {
      * will be set to a default value if one is provided.
      * @param defaultChoice default combobox selection 
      * @param choices dialog choices
-     * @return selected choice or null if dialog is cancelled.
+     * @return Optional of selected choice or Optional.EMPTY if dialog is cancelled.
      */
-    @SuppressWarnings("unchecked") public <T> T showChoices(T defaultChoice, Collection<T> choices) {
+    public <T> Optional<T> showChoices(T defaultChoice, Collection<T> choices) {
 
         Dialog dlg = buildDialog(Type.INPUT);
-        // Workaround: need final variable without custom change listener
-        final Object[] response = new Object[1];
-        ChangeListener<T> changeListener = new ChangeListener<T>() {
-            @Override public void changed(ObservableValue<? extends T> ov, T t, T t1) {
-                response[0] = t1;
-            }
-        };
         
         final double MIN_WIDTH = 150;
+        SelectionModel<T> selectionModel=null;
         if (choices.size() > 10) {
             // use ComboBox
             ComboBox<T> comboBox = new ComboBox<T>();
             comboBox.setMinWidth(MIN_WIDTH);
             comboBox.getItems().addAll(choices);
-            comboBox.getSelectionModel().select(defaultChoice);
-            comboBox.getSelectionModel().selectedItemProperty().addListener(changeListener);
+            selectionModel = comboBox.getSelectionModel();
             dlg.setContent(buildInputContent(comboBox));
         } else {
             // use ChoiceBox
             ChoiceBox<T> choiceBox = new ChoiceBox<T>();
             choiceBox.setMinWidth(MIN_WIDTH);
             choiceBox.getItems().addAll(choices);
-            choiceBox.getSelectionModel().select(defaultChoice);
-            choiceBox.getSelectionModel().selectedItemProperty().addListener(changeListener);
+            selectionModel = choiceBox.getSelectionModel();
             dlg.setContent(buildInputContent(choiceBox));
         }
+        if (defaultChoice==null) {
+            selectionModel.selectFirst();
+        } else {
+            selectionModel.select(defaultChoice);
+        }
 
-        return dlg.show() == OK ? (T) response[0] : null;
+        return Optional.ofNullable( dlg.show() == OK ? selectionModel.getSelectedItem() : null);
 
     }
 
     /**
      * Show a dialog with one combobox filled with provided choices 
      * @param choices dialog choices
-     * @return selected choice or null if dialog is cancelled
+     * @return Optional of selected choice or Optinal.EMPTY if dialog is cancelled
      */
-    public <T> T showChoices(Collection<T> choices) {
+    public <T> Optional<T> showChoices(Collection<T> choices) {
         return showChoices(null, choices);
     }
 
     /**
      * Show a dialog with one combobox filled with provided choices 
      * @param choices dialog choices
-     * @return selected choice or null if dialog is cancelled
+     * @return Optional of selected choice or Optional.EMPTY if dialog is cancelled
      */
-    public <T> T showChoices(@SuppressWarnings("unchecked") T... choices) {
+    public <T> Optional<T> showChoices(@SuppressWarnings("unchecked") T... choices) {
         return showChoices(Arrays.asList(choices));
     }
 
@@ -707,16 +736,16 @@ public final class Dialogs {
      * Show font selection dialog, allowing to manipulate font name, style and size. 
      * 
      * @param font default font value 
-     * @return selected font or null if the dialog is canceled.
+     * @return Optional of selected font. Optional.Empty returned if dialog is cancelled.
      */
-    public Font showFontSelector(Font font) {
+    public Optional<Font> showFontSelector(Font font) {
         FontPanel fontPanel = new FontPanel();
         fontPanel.setFont(font);
         title(Dialogs.USE_DEFAULT);
         Dialog dlg = buildDialog(Type.FONT);
         dlg.setIconifiable(false);
         dlg.setContent(fontPanel);
-        return Dialog.Actions.OK == dlg.show() ? fontPanel.getFont(): null;
+        return Optional.ofNullable( Dialog.Actions.OK == dlg.show() ? fontPanel.getFont(): null );
     }
     
     /**
@@ -884,8 +913,19 @@ public final class Dialogs {
 		
     }
     
-    
-    public Optional<UserInfo> showLogin( final UserInfo userInfo, final Callback<UserInfo, Void> authenticator ) {
+    /**
+     * Creates a Login {@link Dialog} whith user name and password  fields
+     * 
+     * @param initialUserInfo user information initially shown in the dialog
+     * @param authenticator callback to execute actual authentication process. Exceptions coming from this callback are interpreted as
+     * authentication errors and will be shown as error message. In case of an exception the dialog will not close to give the user 
+     * an opportunity to correct their information and try again
+     * 
+     * @return optional of UserInfo. Optional.EMPTY returned in case of cancelled dialog otherwise Optional of UserInfo value with provided user name
+     * and password
+     *  
+     */
+    public Optional<UserInfo> showLogin( final UserInfo initialUserInfo, final Callback<UserInfo, Void> authenticator ) {
     	
     	TextField txUserName     = new TextField();
 		PasswordField txPassword = new PasswordField();
@@ -917,7 +957,9 @@ public final class Dialogs {
 			public void execute(ActionEvent ae) {
 				Dialog dlg = (Dialog) ae.getSource();
 				try {
-					authenticator.call( new UserInfo(txUserName.getText(), txPassword.getText() ) );
+					if ( authenticator != null ) {
+						authenticator.call( new UserInfo(txUserName.getText(), txPassword.getText() ) );
+					}
 					lbMessage.setVisible(false);
 					dlg.hide();
 					dlg.setResult(this);
@@ -958,8 +1000,8 @@ public final class Dialogs {
 			dlg.setGraphic( new ImageView( DialogResources.getImage("login.icon")));
 		}
 		dlg.getActions().setAll(actionLogin, Dialog.Actions.CANCEL);
-		txUserName.setText( userInfo.getUserName());
-		txPassword.setText(new String(userInfo.getPassword()));
+		txUserName.setText( initialUserInfo.getUserName());
+		txPassword.setText(new String(initialUserInfo.getPassword()));
 
 		Platform.runLater( () -> txUserName.requestFocus() );
 
@@ -989,6 +1031,7 @@ public final class Dialogs {
         }
         dlg.setMasthead(actualMasthead);
         dlg.getActions().addAll(dlgType.getActions());
+        dlg.setBackgroundEffect(backgroundEffect);
         return dlg;
     }
 
