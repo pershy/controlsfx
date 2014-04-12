@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2013, ControlsFX
+ * Copyright (c) 2013, 2014 ControlsFX
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -29,7 +29,6 @@ package org.controlsfx.control;
 import impl.org.controlsfx.skin.SegmentedButtonSkin;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
-import javafx.scene.control.Control;
 import javafx.scene.control.Skin;
 import javafx.scene.control.ToggleButton;
 import javafx.scene.control.ToggleGroup;
@@ -50,7 +49,7 @@ import javafx.scene.control.ToggleGroup;
  * <p>There is very little API on this control, you essentially create
  * {@link ToggleButton} instances as per usual (and don't bother putting them
  * into a {@link ToggleGroup}, as this is done by the SegmentedButton itself), and then 
- * you place these buttons inside the {@link #getButtons() buttons list}. The 
+ * you place these buttons inside the {@link #getItems() buttons list}. The
  * long-hand way to code this is as follows:
  * 
  * <pre>
@@ -84,7 +83,7 @@ import javafx.scene.control.ToggleGroup;
  * @see ToggleButton
  * @see ToggleGroup
  */
-public class SegmentedButton extends Control {
+public class SegmentedButton extends SegmentedBar<ToggleButton> {
     
     /**************************************************************************
      * 
@@ -114,8 +113,7 @@ public class SegmentedButton extends Control {
      * 
      *************************************************************************/
     
-    private final ObservableList<ToggleButton> buttons;
-    
+
     /**************************************************************************
      * 
      * Constructors
@@ -126,7 +124,7 @@ public class SegmentedButton extends Control {
      * Creates a default SegmentedButton instance with no buttons.
      */
     public SegmentedButton() {
-        this((ObservableList<ToggleButton>)null);
+        this((ObservableList<ToggleButton>) null);
     }
     
     /**
@@ -137,8 +135,8 @@ public class SegmentedButton extends Control {
      *      instance.
      */
     public SegmentedButton(ToggleButton... buttons) {
-        this(buttons == null ? 
-                FXCollections.<ToggleButton>observableArrayList() : 
+        this(buttons == null ?
+                FXCollections.<ToggleButton>observableArrayList() :
                 FXCollections.observableArrayList(buttons));
     }
     
@@ -149,12 +147,8 @@ public class SegmentedButton extends Control {
      * @param buttons A list of buttons to add into the SegmentedButton instance.
      */
     public SegmentedButton(ObservableList<ToggleButton> buttons) {
+        super(buttons);
         getStyleClass().add("segmented-button"); //$NON-NLS-1$
-        this.buttons = buttons == null ? FXCollections.<ToggleButton>observableArrayList() : buttons;
-        
-        // Fix for Issue #87:
-        // https://bitbucket.org/controlsfx/controlsfx/issue/87/segmentedbutton-keyboard-focus-traversal
-        setFocusTraversable(false);
     }
     
 
@@ -165,22 +159,11 @@ public class SegmentedButton extends Control {
      * Public API
      * 
      *************************************************************************/
-    
+
     /** {@inheritDoc} */
     @Override protected Skin<?> createDefaultSkin() {
         return new SegmentedButtonSkin(this);
     }
-    
-    /**
-     * Returns the list of buttons that this SegmentedButton will draw together
-     * into one 'grouped button'. It is possible to modify this list to add or
-     * remove {@link ToggleButton} instances, as shown in the javadoc 
-     * documentation for this class.
-     */
-    public final ObservableList<ToggleButton> getButtons() {
-        return buttons;
-    }
-    
     
     /**************************************************************************
      * 
