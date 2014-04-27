@@ -125,7 +125,7 @@ public class DockTreeItem {
      **************************************************************************/
     
     // miscellaneous properties of this specific tree item
-    // e.g. text, graphic, context menu, content, collapsed
+    // e.g. text, graphic, context menu, content, collapsed, floating
     // Conceptually this should be thought of as a Tab, but we are not constraining
     // ourselves to being a Tab.
     
@@ -223,6 +223,13 @@ public class DockTreeItem {
     public final void setCollapsed(boolean value) { collapsedProperty().set(value);  }
     public final boolean isCollapsed() { return collapsed.get(); }
     public final BooleanProperty collapsedProperty() { return collapsed; }
+    
+    
+    // --- floating
+    private BooleanProperty floating = new SimpleBooleanProperty(this, "floating", false);
+    public final void setFloating(boolean value) { floatingProperty().set(value);  }
+    public final boolean isFloating() { return floating.get(); }
+    public final BooleanProperty floatingProperty() { return floating; }
     
     
     
