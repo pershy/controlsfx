@@ -1,6 +1,7 @@
 package org.controlsfx.control.docking;
 
 import java.util.List;
+import javafx.application.Platform;
 
 import javafx.beans.property.BooleanProperty;
 import javafx.beans.property.ObjectProperty;
@@ -250,19 +251,21 @@ public class DockPane extends Region implements DockingContainer {
     
     @Override protected void layoutChildren() {
         borderPane.resizeRelocate(0, 0, getWidth(), getHeight());
-        
-        // draw the drag rects over the top of the borderpane content
-        Node node = borderPane.getLeft();
-        leftDragRect = addDragRect(node, Side.LEFT, leftDragRect);
-        
-        node = borderPane.getRight();
-        rightDragRect = addDragRect(node, Side.RIGHT, rightDragRect);
-        
-        node = borderPane.getTop();
-        topDragRect = addDragRect(node, Side.TOP, topDragRect);
-        
-        node = borderPane.getBottom();
-        bottomDragRect = addDragRect(node, Side.BOTTOM, bottomDragRect);
+
+        Platform.runLater(() -> {
+            // draw the drag rects over the top of the borderpane content
+            Node node = borderPane.getLeft();
+            leftDragRect = addDragRect(node, Side.LEFT, leftDragRect);
+
+            node = borderPane.getRight();
+            rightDragRect = addDragRect(node, Side.RIGHT, rightDragRect);
+
+            node = borderPane.getTop();
+            topDragRect = addDragRect(node, Side.TOP, topDragRect);
+
+            node = borderPane.getBottom();
+            bottomDragRect = addDragRect(node, Side.BOTTOM, bottomDragRect);
+        });   
     }
 
     /**
@@ -313,68 +316,57 @@ public class DockPane extends Region implements DockingContainer {
                            break;
             default: x = y = width = height = 0; 
         }
-        
-        // FIXME this is ugly, but it is temporary as we are using rectangles
-        if (dragRect != null) {
-            getChildren().remove(dragRect);
-        }
-        dragRect = new Rectangle(width, height);
-        dragRect.setCursor(cursor);
-        dragRect.setFill(DEBUG ? Color.BLUE : Color.TRANSPARENT);
-        getChildren().add(dragRect);
-        dragRect.relocate(x, y);
-        
-        // add in resizing logic
-        dragRect.setOnMousePressed(new EventHandler<MouseEvent>() {
-            @Override public void handle(MouseEvent event) {
-                switch (side) {
-                    case LEFT:
-                    case RIGHT:  resizingNodeStartSize = bounds.getWidth();
-                                 break;
-                    case TOP:
-                    case BOTTOM: resizingNodeStartSize = bounds.getHeight();
-                                 break;            
-                }
-            }
-        });
-        dragRect.setOnMouseDragged(new EventHandler<MouseEvent>() {
-            @Override public void handle(MouseEvent event) {
-                final double width = bounds.getWidth();
-                final double height = bounds.getHeight();
-                
-                double newWidth, newHeight;
-                switch (side) {
-                    case LEFT:   newWidth = resizingNodeStartSize + event.getX();
-                                 newHeight = height;
-                                 break;
-                        
-                    case RIGHT:  newWidth = resizingNodeStartSize - event.getX();
-                                 newHeight = height;
-                                 break;
-                                 
-                    case TOP:    newWidth = width;
-                                 newHeight = resizingNodeStartSize + event.getY();
-                                 break; 
-                        
-                    case BOTTOM: newWidth = width;
-                                 newHeight = resizingNodeStartSize - event.getY();
-                                 break; 
-                                 
-                     default: newWidth = newHeight = 0;
-                }
 
-                if (node instanceof Region) {
-                    ((Region)node).setPrefSize(newWidth, newHeight);
-                } else {
-                    node.resize(newWidth, newHeight);
-                }
+        if (dragRect == null) {
+            dragRect = new Rectangle(width, height);
+            dragRect.setCursor(cursor);
+            dragRect.setFill(DEBUG ? Color.BLUE : Color.TRANSPARENT);
+            getChildren().add(dragRect);
+        } else {
+            dragRect.setWidth(width);
+            dragRect.setHeight(height);
+        }
+
+        dragRect.setOnMouseDragged((MouseEvent event) -> {
+            final double nodeWidth = bounds.getWidth();
+            final double nodeHeight = bounds.getHeight();
+            double newWidth, newHeight;
+            switch (side) {
+                case LEFT:
+                    newWidth = nodeWidth + event.getX();
+                    newHeight = nodeHeight;
+                    break;
+
+                case RIGHT:
+                    newWidth = nodeWidth - event.getX();
+                    newHeight = nodeHeight;
+                    break;
+
+                case TOP:
+                    newWidth = nodeWidth;
+                    newHeight = nodeHeight + event.getY();
+                    break;
+
+                case BOTTOM:
+                    newWidth = nodeWidth;
+                    newHeight = nodeHeight - event.getY();
+                    break;
+
+                default:
+                    newWidth = newHeight = 0;
+            }
+
+            if (node instanceof Region) {
+                ((Region) node).setPrefSize(newWidth, newHeight);
+            } else {
+                node.resize(newWidth, newHeight);
             }
         });
-        
+
+        dragRect.relocate(x, y);
+        dragRect.setVisible(true);
         return dragRect;
     }
-    
-    private double resizingNodeStartSize = -1;
     
     void expand(final Side side) {
         if (side == null || ! isExpanded(side)) return;
