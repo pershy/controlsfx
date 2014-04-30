@@ -1,15 +1,17 @@
 package org.controlsfx.control.docking;
 
 import java.util.List;
-import javafx.application.Platform;
+import javafx.beans.Observable;
+import javafx.beans.binding.Bindings;
 
 import javafx.beans.property.BooleanProperty;
 import javafx.beans.property.ObjectProperty;
 import javafx.beans.property.SimpleBooleanProperty;
+import javafx.beans.property.SimpleDoubleProperty;
 import javafx.beans.property.SimpleObjectProperty;
+import javafx.beans.value.ObservableValue;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
-import javafx.event.EventHandler;
 import javafx.geometry.Bounds;
 import javafx.geometry.Side;
 import javafx.scene.Cursor;
@@ -42,6 +44,22 @@ public class DockPane extends Region implements DockingContainer {
         setMaxSize(Double.MAX_VALUE, Double.MAX_VALUE);
         
         this.borderPane = new BorderPane();
+        // Add Listeners for drag rectangle
+        borderPane.leftProperty().addListener((Observable o) -> {
+            leftDragRect = getDragRectangle(Side.LEFT, borderPane.getLeft());
+        });
+        
+        borderPane.rightProperty().addListener((Observable o) -> {
+            rightDragRect = getDragRectangle(Side.RIGHT, borderPane.getRight());
+        });
+        
+        borderPane.topProperty().addListener((Observable o) -> {
+            topDragRect = getDragRectangle(Side.TOP, borderPane.getTop());
+        });
+        
+        borderPane.bottomProperty().addListener((Observable o) -> {
+            bottomDragRect = getDragRectangle(Side.BOTTOM, borderPane.getBottom());
+        });
 //        borderPane.setStyle("-fx-background-color: orange");
         getChildren().add(borderPane);
     }
@@ -251,83 +269,89 @@ public class DockPane extends Region implements DockingContainer {
     
     @Override protected void layoutChildren() {
         borderPane.resizeRelocate(0, 0, getWidth(), getHeight());
-
-        Platform.runLater(() -> {
-            // draw the drag rects over the top of the borderpane content
-            Node node = borderPane.getLeft();
-            leftDragRect = addDragRect(node, Side.LEFT, leftDragRect);
-
-            node = borderPane.getRight();
-            rightDragRect = addDragRect(node, Side.RIGHT, rightDragRect);
-
-            node = borderPane.getTop();
-            topDragRect = addDragRect(node, Side.TOP, topDragRect);
-
-            node = borderPane.getBottom();
-            bottomDragRect = addDragRect(node, Side.BOTTOM, bottomDragRect);
-        });   
     }
-
+    
     /**
-     * @param node
-     * @param side specifies the side that this node is in within the BorderPane,
-     *      so the dragRect has to be on the opposite side
-     * 
+     * Creates a drag rectangle with appropriate bindings and adds it to children 
+     * list
+     * @param side The side to which the node belongs to
+     * @param node The node which this drag rectangle manages
+     * @return 
      */
-    private Rectangle addDragRect(final Node node, final Side side, Rectangle dragRect) {
+    private Rectangle getDragRectangle(Side side, Node node) {
+        final Rectangle dragRect = new Rectangle();
         if (node == null) {
-            if (dragRect != null) {
-                dragRect.setVisible(false);
-            }
+            dragRect.setVisible(false);
             return dragRect;
         }
-        
-        double x, y, width, height;
-        Cursor cursor = Cursor.DEFAULT;
-        
+        dragRect.setFill(DEBUG ? Color.BLUE : Color.TRANSPARENT);
         final double WIDTH = 3.0;
         final double HALF_WIDTH = WIDTH / 2.0;
-        final Bounds bounds = node.getLayoutBounds();
-        
+        Cursor cursor = Cursor.DEFAULT;
+        ObservableValue<Number> x;
+        ObservableValue<Number> y;
+        ObservableValue<Number> width;
+        ObservableValue<Number> height;
         switch (side) {
-            case LEFT:     x = node.getLayoutX() + bounds.getWidth() - HALF_WIDTH;
-                           y = node.getLayoutY();
-                           width = WIDTH;
-                           height = bounds.getHeight();
-                           cursor = Cursor.H_RESIZE;
-                           break;
-            case RIGHT:    x = node.getLayoutX() - HALF_WIDTH;
-                           y = node.getLayoutY();
-                           width = WIDTH;
-                           height = bounds.getHeight();
-                           cursor = Cursor.H_RESIZE;
-                           break;
-            case TOP:      x = node.getLayoutX();
-                           y = node.getLayoutY() + bounds.getHeight() - HALF_WIDTH;
-                           width = bounds.getWidth();
-                           height = WIDTH;
-                           cursor = Cursor.V_RESIZE;
-                           break;
-            case BOTTOM:   x = node.getLayoutX();
-                           y = node.getLayoutY() - HALF_WIDTH;
-                           width = bounds.getWidth();
-                           height = WIDTH;
-                           cursor = Cursor.V_RESIZE;
-                           break;
-            default: x = y = width = height = 0; 
+            case LEFT:
+                x = Bindings.createDoubleBinding(() -> {
+                    return node.getLayoutX() + node.getLayoutBounds().getWidth() - HALF_WIDTH;
+                }, node.layoutXProperty(), node.layoutBoundsProperty());
+                y = node.layoutYProperty();
+                width = new SimpleDoubleProperty(WIDTH);
+                height = Bindings.createDoubleBinding(() -> {
+                    return node.getLayoutBounds().getHeight();
+                }, node.layoutBoundsProperty());
+                cursor  = Cursor.H_RESIZE;
+                break;
+            case RIGHT:
+                x = Bindings.createDoubleBinding(() -> {
+                    return node.getLayoutX() - HALF_WIDTH;
+                }, node.layoutBoundsProperty());
+                y = node.layoutYProperty();
+                width = new SimpleDoubleProperty(WIDTH);
+                height = Bindings.createDoubleBinding(() -> {
+                    return node.getLayoutBounds().getHeight();
+                }, node.layoutBoundsProperty());
+                cursor = Cursor.H_RESIZE;
+                break;
+            case TOP:
+                x = node.layoutXProperty();
+                y = Bindings.createDoubleBinding(() -> {
+                    return node.getLayoutY() + node.getLayoutBounds().getHeight() - HALF_WIDTH;
+                }, node.layoutYProperty(), node.layoutBoundsProperty());
+                width = Bindings.createDoubleBinding(() -> {
+                    return node.getLayoutBounds().getWidth();
+                }, node.layoutBoundsProperty());
+                height = new SimpleDoubleProperty(WIDTH);
+                cursor = Cursor.V_RESIZE;
+                break;
+            case BOTTOM:
+                x = node.layoutXProperty();
+                y = Bindings.createDoubleBinding(() -> {
+                    return node.getLayoutY() - HALF_WIDTH;
+                }, node.layoutBoundsProperty());
+                width = Bindings.createDoubleBinding(() -> {
+                    return node.getLayoutBounds().getWidth();
+                }, node.layoutBoundsProperty());
+                height = new SimpleDoubleProperty(WIDTH);
+                cursor = Cursor.V_RESIZE;
+                break;
+            default:
+                x = new SimpleDoubleProperty(0);
+                y = new SimpleDoubleProperty(0);
+                width = new SimpleDoubleProperty(0);
+                height = new SimpleDoubleProperty(0);
+                break;
         }
-
-        if (dragRect == null) {
-            dragRect = new Rectangle(width, height);
-            dragRect.setCursor(cursor);
-            dragRect.setFill(DEBUG ? Color.BLUE : Color.TRANSPARENT);
-            getChildren().add(dragRect);
-        } else {
-            dragRect.setWidth(width);
-            dragRect.setHeight(height);
-        }
-
+        dragRect.layoutXProperty().bind(x);
+        dragRect.layoutYProperty().bind(y);
+        dragRect.widthProperty().bind(width);
+        dragRect.heightProperty().bind(height);
+        dragRect.setCursor(cursor);
+        
         dragRect.setOnMouseDragged((MouseEvent event) -> {
+            Bounds bounds = node.getLayoutBounds();
             final double nodeWidth = bounds.getWidth();
             final double nodeHeight = bounds.getHeight();
             double newWidth, newHeight;
@@ -362,9 +386,7 @@ public class DockPane extends Region implements DockingContainer {
                 node.resize(newWidth, newHeight);
             }
         });
-
-        dragRect.relocate(x, y);
-        dragRect.setVisible(true);
+        getChildren().add(dragRect);
         return dragRect;
     }
     
