@@ -284,9 +284,6 @@ public class DockTreeItem implements EventTarget {
      * 
      **************************************************************************/
 
-    // Event Handler Manager to manage event handlers registered to this DockTreeItem
-    private final EventHandlerManager eventHandlerManager = new EventHandlerManager(this);
-
     // Each DockTreeItem can contain children items. If this list is
     // non-empty, the DockTreeItem changes state from simple to complex.
     private final ObservableList<DockTreeItem> children = FXCollections.observableArrayList();
