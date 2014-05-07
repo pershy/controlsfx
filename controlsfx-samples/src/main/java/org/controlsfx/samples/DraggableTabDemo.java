@@ -1,6 +1,6 @@
 /**
  * Copyright (c) 2014, ControlsFX All rights reserved.
- *
+ * <p>
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met: *
  * Redistributions of source code must retain the above copyright notice, this
@@ -11,7 +11,7 @@
  * website, nor the names of its contributors may be used to endorse or promote
  * products derived from this software without specific prior written
  * permission.
- *
+ * <p>
  * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
  * AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
  * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
@@ -26,21 +26,22 @@
 package org.controlsfx.samples;
 
 import java.util.concurrent.Callable;
-import javafx.application.Application;
-import javafx.scene.Scene;
+import javafx.scene.Node;
 import javafx.scene.control.TabPane;
 import javafx.scene.layout.StackPane;
 import javafx.scene.paint.Color;
 import javafx.scene.shape.Rectangle;
 import javafx.stage.Stage;
+import org.controlsfx.ControlsFXSample;
+import org.controlsfx.control.DraggableTab;
 
 /**
  * Just a very simple sample application to demonstrate draggable tabs.
  */
-public class DraggableTabDemo extends Application {
- 
+public class DraggableTabDemo extends ControlsFXSample {
+
     @Override
-    public void start(final Stage primaryStage) {
+    public Node getPanel(Stage stage) {
         DraggableTab tab1 = new DraggableTab("Tab 1");
         tab1.setMoveCallback(new Callable<Boolean>() {
 
@@ -73,14 +74,26 @@ public class DraggableTabDemo extends Application {
         tabs.getTabs().add(tab2);
         tabs.getTabs().add(tab3);
         tabs.getTabs().add(tab4);
- 
+
         StackPane root = new StackPane();
         root.getChildren().add(tabs);
- 
-        Scene scene = new Scene(root);
- 
-        primaryStage.setScene(scene);
-        primaryStage.show();
- 
+
+        return root;
+    }
+
+    @Override
+    public String getSampleName() {
+        return "Draggable Tabs";
+    }
+
+    @Override
+    public String getJavaDocURL() {
+        return ""; //Not entirely sure where this should point to?
+    }
+
+    @Override
+    public String getSampleDescription() {
+        return "A demo application that shows how the DraggableTab class can "
+                + "be used to move and detach tabs from their parent TabPane.";
     }
 }
