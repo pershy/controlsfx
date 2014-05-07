@@ -75,7 +75,7 @@ public class DraggableTab extends Tab {
     /**
      * Create a new draggable tab. This can be added to any normal TabPane,
      * however a TabPane with draggable tabs must *only* have DraggableTabs,
-     * normal tabs and DrragableTabs mixed will cause issues!
+     * normal tabs and DragableTabs mixed will cause issues!
      * <p>
      * @param text the text to appear on the tag label.
      */
