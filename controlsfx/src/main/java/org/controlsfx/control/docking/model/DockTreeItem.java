@@ -26,30 +26,42 @@
  */
 package org.controlsfx.control.docking.model;
 
+import com.sun.javafx.event.EventHandlerManager;
+import java.util.List;
 import javafx.beans.InvalidationListener;
-import javafx.beans.property.BooleanProperty;
 import javafx.beans.property.ObjectProperty;
-import javafx.beans.property.SimpleBooleanProperty;
+import javafx.beans.property.ObjectPropertyBase;
+import javafx.beans.property.ReadOnlyObjectWrapper;
 import javafx.beans.property.SimpleObjectProperty;
-import javafx.beans.property.SimpleStringProperty;
 import javafx.beans.property.StringProperty;
+import javafx.beans.property.StringPropertyBase;
 import javafx.collections.FXCollections;
+import javafx.collections.ListChangeListener;
+import javafx.collections.ListChangeListener.Change;
 import javafx.collections.ObservableList;
+import javafx.event.Event;
+import javafx.event.EventDispatchChain;
+import javafx.event.EventTarget;
+import javafx.event.EventType;
 import javafx.scene.Node;
 import javafx.scene.control.ContextMenu;
+import org.controlsfx.control.docking.Dock;
 
 /**
- * A DockTreeItem is the model used to represent the hierachy of the ControlsFX
+ * A DockTreeItem is the model used to represent the hierarchy of the ControlsFX
  * docking framework. A DockTreeItem can be in one of two states, for now known
  * as 'simple' and 'complex'. In the 'simple' state, the DockTreeItem is essentially
  * a Tab consisting of a title and content, shown relative to its parent (which
  * is necessarily complex by definition of having children). It follows then
- * that the 'complex' state, a DockTreeItem is a container consisting of multiple
- * regions (top, right, bottom, left and center), into which children
- * DockTreeItem elements can be inserted.
+ * that in 'complex' state, a DockTreeItem is a SplitPane with orientation
+ * opposite to that of its parent, into which children DockTreeItem elements 
+ * can be inserted.
+ * 
+ * DockTreeItem will not allow registering event handlers and events occuring 
+ * on DockTreeItem will be bubbled up to the root {@link DockTree}
  */
-public class DockTreeItem {
-    
+public class DockTreeItem implements EventTarget {
+
     /**************************************************************************
      * 
      * Static enumerations
@@ -66,30 +78,239 @@ public class DockTreeItem {
         
         /**
          * Represents the state when the DockTreeItem has one or more items in
-         * the children lists.
+         * the children list.
          */
         COMPLEX
     }
+
+    public static enum DockMode {
+        /**
+         * Represents the DockMode when the node represented by the DockTreeItem 
+         * is collapsed. In this mode, the node will not be visible in the Dock 
+         * and a toggle button will appear on the respective side bar
+         */
+        COLLAPSED,
+        
+        /**
+         * Represents the DockMode when the node represented by the DockTreeItem
+         * is previewed above other nodes in its side as a result of user 
+         * clicking on the toggle button in the side bar
+         */
+        FLOATING,
+        
+        /**
+         * Represents the DockMode when the node represented by the DockTreeItem
+         * is visible inside the {@link Dock} in its respective position. This 
+         * is the default DockMode of a DockTreeItem
+         */
+        DOCKED
+    }
     
+    /**************************************************************************
+     * 
+     * Event Definitions and Event Management
+     * 
+     *************************************************************************/
+
+    public static final EventType<DockTreeChangeEvent> TREE_MODIFICATION_EVENT
+            = new EventType<>(Event.ANY, "TreeModificationEvent");
+    
+    public static final EventType<DockTreeChangeEvent> DOCK_MODE_CHANGE_EVENT
+            = new EventType<>(TREE_MODIFICATION_EVENT, "DockModeChangeEvent");
+
+    public static final EventType<DockTreeChangeEvent> CONTENT_CHANGE_EVENT
+            = new EventType<>(TREE_MODIFICATION_EVENT, "ContentChangeEvent");
+
+    public static final EventType<DockTreeChangeEvent> GRAPHIC_CHANGE_EVENT
+            = new EventType<>(TREE_MODIFICATION_EVENT, "GraphicChangeEvent");
+
+    public static final EventType<DockTreeChangeEvent> TEXT_CHANGE_EVENT
+            = new EventType<>(TREE_MODIFICATION_EVENT, "TextChangeEvent");
+
+    public static final EventType<DockTreeChangeEvent> CHILDREN_MODIFICATION_EVENT
+            = new EventType<>(TREE_MODIFICATION_EVENT, "ChildrenModificationEvent");
+
+    public static final EventType<DockTreeChangeEvent> STATE_CHANGE_EVENT
+            = new EventType<>(CHILDREN_MODIFICATION_EVENT, "StateChangeEvent");
+
+    @Override
+    public EventDispatchChain buildEventDispatchChain(EventDispatchChain edc) {
+        if (getParent() != null) {
+            getParent().buildEventDispatchChain(edc);
+        }
+        return edc;
+    }
+
+    private void fireEvent(DockTreeChangeEvent event) {
+        Event.fireEvent(this, event);
+    }
+
+    /**
+     * Event class that contains data about what changes happened in the
+     * DockTreeItem
+     */
+    public static class DockTreeChangeEvent extends Event {
+
+        private DockTreeItem dockTreeItem;
+        private Node newContent;
+        private List<? extends DockTreeItem> addedItems;
+        private List<? extends DockTreeItem> removedItems;
+        private DockMode newMode;
+        private State newState;
+        private String newText;
+
+        /**
+         * Constructs a default DockTreeChangeEvent without any specific 
+         * information
+         * @param eventType Type of event occured. Mostly EventType.ANY in this case
+         * @param dockTreeItem The Item on which the event occurred
+         */
+        public DockTreeChangeEvent(EventType<? extends Event> eventType, DockTreeItem dockTreeItem) {
+            super(eventType);
+            this.dockTreeItem = dockTreeItem;
+            this.newContent = null;
+            this.addedItems = null;
+            this.removedItems = null;
+            this.newState = null;
+            this.newMode = null;
+            this.newText = null;
+        }
+
+        /**
+         * Constructs a DockTreeChangeEvent which can be used when there is a 
+         * change in the children list of {@link DockTreeItem}
+         * @param eventType The type of event that has occured
+         * @param dockTreeItem The Item on which the event occured
+         * @param addedItems A list items which were added to the DockTreeItem
+         * @param removedItems A list of item which were removed from DockTreeItem
+         */
+        public DockTreeChangeEvent(EventType<? extends Event> eventType, DockTreeItem dockTreeItem,
+                List<? extends DockTreeItem> addedItems, List<? extends DockTreeItem> removedItems) {
+            this(eventType, dockTreeItem);
+            this.addedItems = addedItems;
+            this.removedItems = removedItems;
+        }
+
+        /**
+         * Constructs a DockTreeChangeEvent which can be used when state of the 
+         * DockTreeItem changes
+         * @param eventType The type of event that has occured
+         * @param dockTreeItem The Item on which the event occured
+         * @param state The new state of the DockTreeItem
+         */
+        public DockTreeChangeEvent(EventType<? extends Event> eventType, DockTreeItem dockTreeItem,
+                State state) {
+            this(eventType, dockTreeItem);
+            this.newState = state;
+        }
+
+        /**
+         * Constructs a DockTreeChangeEvent which can be used when mode of the
+         * DockTreeItem changes
+         * @param eventType The type of event that has occured
+         * @param dockTreeItem The Item on which the event occured
+         * @param mode The new DockMode of this item
+         */
+        public DockTreeChangeEvent(EventType<? extends Event> eventType, DockTreeItem dockTreeItem,
+                DockMode mode) {
+            this(eventType, dockTreeItem);
+            this.newMode = mode;
+        }
+
+        /**
+         * Constructs a DockTreeChangeEvent which can be used when content of the
+         * DockTreeItem changes
+         * @param eventType The type of event that has occured
+         * @param dockTreeItem The Item on which the event occured
+         * @param content The new content
+         */
+        public DockTreeChangeEvent(EventType<? extends Event> eventType, DockTreeItem dockTreeItem,
+                Node content) {
+            this(eventType, dockTreeItem);
+            this.newContent = content;
+        }
+
+        /**
+         * Constructs a DockTreeChangeEvent which can be used when text of the 
+         * DockTreeItem changes
+         * @param eventType The type of event that has occured
+         * @param dockTreeItem The Item on which the event occured
+         * @param text The new Text
+         */
+        public DockTreeChangeEvent(EventType<? extends Event> eventType, DockTreeItem dockTreeItem,
+                String text) {
+            this(eventType, dockTreeItem);
+            this.newText = text;
+        }
+
+        /**
+         * Gets the DockTreeItem on which the event initially occurred
+         * @return {@link DockTreeItem}
+         */
+        @Override
+        public Object getSource() {
+            return dockTreeItem;
+        }
+
+        public Node getNewContent() {
+            return newContent;
+        }
+
+        public List<? extends DockTreeItem> getAddedItems() {
+            return addedItems;
+        }
+
+        public List<? extends DockTreeItem> getRemovedItems() {
+            return removedItems;
+        }
+
+        public DockMode getNewMode() {
+            return newMode;
+        }
+
+        public State getNewState() {
+            return newState;
+        }
+
+        public String getNewText() {
+            return newText;
+        }
+
+    }
     
     /**************************************************************************
      * 
      * Private fields
      * 
      **************************************************************************/
-    
-    // Each DockTreeItem can contain children elements. If any of these lists is
+
+    // Event Handler Manager to manage event handlers registered to this DockTreeItem
+    private final EventHandlerManager eventHandlerManager = new EventHandlerManager(this);
+
+    // Each DockTreeItem can contain children items. If this list is
     // non-empty, the DockTreeItem changes state from simple to complex.
-    private final ObservableList<DockTreeItem> topItems = FXCollections.<DockTreeItem>observableArrayList();
-    private final ObservableList<DockTreeItem> rightItems = FXCollections.observableArrayList();
-    private final ObservableList<DockTreeItem> bottomItems = FXCollections.observableArrayList();
-    private final ObservableList<DockTreeItem> leftItems = FXCollections.observableArrayList();
-    private final ObservableList<DockTreeItem> centerItems = FXCollections.observableArrayList();
+    private final ObservableList<DockTreeItem> children = FXCollections.observableArrayList();
     
     private final InvalidationListener itemsListListener = o -> checkState();
     
-    
-    
+    // Listens Addition or Removal from children list and updates the parent for each child
+    // added or removed
+    private final ListChangeListener<DockTreeItem> childrenListener = (Change<? extends DockTreeItem> change) -> {
+        while (change.next()) {
+            List<? extends DockTreeItem> addedItems  = change.getAddedSubList();
+            List<? extends DockTreeItem> removedItems = change.getRemoved();
+            if (addedItems != null) {
+                addedItems.stream().filter((treeItem) -> (treeItem != null))
+                    .forEach((treeItem) -> (treeItem.setParent(this)));
+            }
+            if (removedItems != null) {
+                removedItems.stream().filter((treeItem) -> (treeItem != null))
+                    .forEach((treeItem) -> (treeItem.setParent(null)));
+            }
+            fireEvent(new DockTreeChangeEvent(CHILDREN_MODIFICATION_EVENT, this, addedItems, removedItems));
+        }
+    };
+
     /**************************************************************************
      * 
      * Constructors
@@ -97,26 +318,26 @@ public class DockTreeItem {
      **************************************************************************/
     
     /**
-     * Creates a defult DockTreeItem instance
+     * Creates a default DockTreeItem instance
      */
     public DockTreeItem() {
-        topItems.addListener(itemsListListener);
-        rightItems.addListener(itemsListListener);
-        bottomItems.addListener(itemsListListener);
-        leftItems.addListener(itemsListListener);
-        centerItems.addListener(itemsListListener);
+        this("New Tab");
     }
-    
+
+    /**
+     * Creates a DockTreeItem with title text
+     * @param text The title for this item 
+     */
+    public DockTreeItem(String text) {
+        setText(text);
+        children.addListener(itemsListListener);
+        children.addListener(childrenListener);
+    }
 
     private void checkState() {
-        // if any of the items lists are not empty, we are in the complex state
-        setState((!topItems.isEmpty() || 
-                  !rightItems.isEmpty() || 
-                  !bottomItems.isEmpty() || 
-                  !leftItems.isEmpty() || 
-                  !centerItems.isEmpty()) ? State.COMPLEX : State.SIMPLE);
+        // if children list is not empty, we are in the complex state
+        setState(!children.isEmpty() ? State.COMPLEX : State.SIMPLE);
     }
-
 
     /**************************************************************************
      * 
@@ -125,17 +346,38 @@ public class DockTreeItem {
      **************************************************************************/
     
     // miscellaneous properties of this specific tree item
-    // e.g. text, graphic, context menu, content, collapsed, floating
+    // e.g. text, graphic, context menu, content, state
     // Conceptually this should be thought of as a Tab, but we are not constraining
     // ourselves to being a Tab.
     
     // --- text
-    private StringProperty text = new SimpleStringProperty(this, "text");
-    public final StringProperty textProperty() { return text; }
+    private StringProperty text;
+    public final StringProperty textProperty() {
+        if(text == null) {
+            text = new StringPropertyBase() {
+                @Override
+                public void invalidated() {
+                    fireEvent(new DockTreeChangeEvent(TEXT_CHANGE_EVENT, DockTreeItem.this, get()));
+                }
+
+                @Override
+                public Object getBean() {
+                    return DockTreeItem.this;
+                }
+
+                @Override
+                public String getName() {
+                    return "text";
+                }
+                
+            };
+        }
+        return text;
+    }
     public final void setText(String value) { textProperty().set(value); }
     public final String getText() { return text.get(); }
-    
-    
+
+
     // --- graphic
     private ObjectProperty<Node> graphic;
 
@@ -163,7 +405,23 @@ public class DockTreeItem {
      */
     public final ObjectProperty<Node> graphicProperty() {
         if (graphic == null) {
-            graphic = new SimpleObjectProperty<Node>(this, "graphic");
+            graphic = new ObjectPropertyBase<Node>() {
+                @Override
+                public void invalidated() {
+                    fireEvent(new DockTreeChangeEvent(GRAPHIC_CHANGE_EVENT, DockTreeItem.this, get()));
+                }
+
+                @Override
+                public Object getBean() {
+                    return DockTreeItem.this;
+                }
+
+                @Override
+                public String getName() {
+                    return "graphic";
+                }
+                
+            };
         }
         return graphic;
     }
@@ -205,57 +463,92 @@ public class DockTreeItem {
      */
     public final ObjectProperty<Node> contentProperty() {
         if (content == null) {
-            content = new SimpleObjectProperty<Node>(this, "content");
+            content = new ObjectPropertyBase<Node>() {
+                @Override
+                public void invalidated() {
+                    fireEvent(new DockTreeChangeEvent(CONTENT_CHANGE_EVENT, DockTreeItem.this, get()));
+                }
+
+                @Override
+                public Object getBean() {
+                    return DockTreeItem.this;
+                }
+
+                @Override
+                public String getName() {
+                    return "content";
+                }
+                
+            };
         }
         return content;
     }
     
+    // --- parent
+    private ReadOnlyObjectWrapper<DockTreeItem> parent = new ReadOnlyObjectWrapper<>(this, "parent");
+    void setParent(DockTreeItem value) { parent.setValue(value); }
+    /**
+     * The parent of this DockTreeItem. A DockTreeItem can have no more than one parent at a time
+     * @return The parent of this DockTreeItem or null if this is a root item
+     */
+    public DockTreeItem getParent() { return parent.getValue(); }
     
     // --- state
-    private ObjectProperty<State> state = new SimpleObjectProperty<State>(this, "state", State.SIMPLE);
+    private ObjectProperty<State> state = new ObjectPropertyBase<State>(State.SIMPLE) {
+        @Override
+        public void invalidated() {
+            fireEvent(new DockTreeChangeEvent(STATE_CHANGE_EVENT, DockTreeItem.this, get()));
+        }
+
+        @Override
+        public Object getBean() {
+            return DockTreeItem.this;
+        }
+
+        @Override
+        public String getName() {
+            return "state";
+        }
+        
+    };
     private final void setState(State value) { stateProperty().set(value);  }
     public final State getState() { return state.get(); }
     public final ObjectProperty<State> stateProperty() { return state; }
     
-    
-    // --- collapsed
-    private BooleanProperty collapsed = new SimpleBooleanProperty(this, "collapsed", false);
-    public final void setCollapsed(boolean value) { collapsedProperty().set(value);  }
-    public final boolean isCollapsed() { return collapsed.get(); }
-    public final BooleanProperty collapsedProperty() { return collapsed; }
-    
-    
-    // --- floating
-    private BooleanProperty floating = new SimpleBooleanProperty(this, "floating", false);
-    public final void setFloating(boolean value) { floatingProperty().set(value);  }
-    public final boolean isFloating() { return floating.get(); }
-    public final BooleanProperty floatingProperty() { return floating; }
-    
-    
+    // --- dock mode
+    private ObjectProperty<DockMode> dockMode = new ObjectPropertyBase<DockMode>(DockMode.DOCKED) {
+        @Override
+        public void invalidated() {
+            fireEvent(new DockTreeChangeEvent(DOCK_MODE_CHANGE_EVENT, DockTreeItem.this, get()));
+        }
+
+        @Override
+        public Object getBean() {
+            return DockTreeItem.this;
+        }
+
+        @Override
+        public String getName() {
+            return "dockMode";
+        }
+    };
+    public final void setDockMode(DockMode mode) { dockMode.set(mode); }
+    public final DockMode getDockMode() { return dockMode.get(); }
+    public final ObjectProperty<DockMode> dockModeProperty() { return dockMode; }
+
     
     /**************************************************************************
      * 
      * Public API
      * 
      **************************************************************************/
-    
-    public final ObservableList<DockTreeItem> getTopItems() {
-        return topItems;
+
+    /**
+     * Children of this DockTreeItem
+     * @return All the children of this DockTreeItem
+     */
+    public final ObservableList<DockTreeItem> getChildren() {
+        return children;
     }
-    
-    public final ObservableList<DockTreeItem> getRightItems() {
-        return rightItems;
-    }
-    
-    public final ObservableList<DockTreeItem> getBottomItems() {
-        return bottomItems;
-    }
-    
-    public final ObservableList<DockTreeItem> getLeftItems() {
-        return leftItems;
-    }
-    
-    public final ObservableList<DockTreeItem> getCenterItems() {
-        return centerItems;
-    }
+
 }
