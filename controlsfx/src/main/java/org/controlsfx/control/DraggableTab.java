@@ -28,6 +28,9 @@ package org.controlsfx.control;
 import java.util.HashSet;
 import java.util.Set;
 import java.util.concurrent.Callable;
+import javafx.beans.property.BooleanProperty;
+import javafx.beans.property.SimpleBooleanProperty;
+import javafx.beans.property.SimpleObjectProperty;
 import javafx.collections.ListChangeListener;
 import javafx.event.EventHandler;
 import javafx.geometry.Point2D;
@@ -60,8 +63,8 @@ public class DraggableTab extends Tab {
     private Text dragText;
     private static final Stage markerStage;
     private Stage dragStage;
-    private boolean detachable;
-    private Callable<Boolean> callback;
+    private SimpleBooleanProperty detachableProperty;
+    private SimpleObjectProperty<Callable<Boolean>> callbackProperty;
 
     static {
         markerStage = new Stage();
@@ -82,7 +85,8 @@ public class DraggableTab extends Tab {
     public DraggableTab(String text) {
         nameLabel = new Label(text);
         setGraphic(nameLabel);
-        detachable = true;
+        detachableProperty = new SimpleBooleanProperty(true);
+        callbackProperty = new SimpleObjectProperty<>();
         dragStage = new Stage();
         dragStage.initStyle(StageStyle.UNDECORATED);
         StackPane dragStagePane = new StackPane();
@@ -130,7 +134,7 @@ public class DraggableTab extends Tab {
                 markerStage.hide();
                 dragStage.hide();
                 try {
-                    if (callback != null && !callback.call()) {
+                    if (callbackProperty.get() != null && !callbackProperty.get().call()) {
                         return;
                     }
                 } catch (Exception ex) {
@@ -159,7 +163,7 @@ public class DraggableTab extends Tab {
                         insertData.getInsertPane().selectionModelProperty().get().select(addIndex);
                         return;
                     }
-                    if (!detachable) {
+                    if (!detachableProperty.get()) {
                         return;
                     }
                     final Stage newStage = new Stage();
@@ -199,13 +203,39 @@ public class DraggableTab extends Tab {
     /**
      * Set the callback that will be called upon attempting to move or detach
      * this tab. If the callback returns false then the tab will be returned to
-     * its original position.
+     * its original position, if it returns true the drag operation will
+     * complete.
      *
      * @param callback the callback to execute to determine whether or not to
      * move or detach this tab.
      */
-    public void setMoveCallback(Callable<Boolean> callback) {
-        this.callback = callback;
+    public final void setMoveCallback(Callable<Boolean> callback) {
+        callbackProperty.set(callback);
+    }
+
+    /**
+     * Get the callback that will be called upon attempting to move or detach
+     * this tab. If the callback returns false then the tab will be returned to
+     * its original position, if it returns true the drag operation will
+     * complete.
+     *
+     * @return the callback to execute to determine whether or not to
+     * move or detach this tab.
+     */
+    public final Callable<Boolean> getMoveCallback() {
+        return callbackProperty.get();
+    }
+
+    /**
+     * Specifies the callback that will be called upon attempting to move or
+     * detach this tab. If the callback returns false then the tab will be
+     * returned to its original position, if it returns true the drag operation
+     * will complete.
+     *
+     * @return the callback property.
+     */
+    public final SimpleObjectProperty<Callable<Boolean>> callbackProperty() {
+        return callbackProperty;
     }
 
     /**
@@ -214,8 +244,28 @@ public class DraggableTab extends Tab {
      * <p>
      * @param detachable true if the tab should be detachable, false otherwise.
      */
-    public void setDetachable(boolean detachable) {
-        this.detachable = detachable;
+    public final void setDetachable(boolean detachable) {
+        detachableProperty.set(detachable);
+    }
+
+    /**
+     * Determine whether it's possible to detach the tab from its pane and move
+     * it to another pane or another window.
+     * <p>
+     * @return the state of the detachable property.
+     */
+    public final boolean isDetachable() {
+        return detachableProperty.get();
+    }
+
+    /**
+     * Specifies whether it's possible to detach the tab from its pane and move
+     * it to another pane or another window. Defaults to true.
+     *
+     * @return the detachable property.
+     */
+    public final BooleanProperty detachableProperty() {
+        return detachableProperty;
     }
 
     /**
