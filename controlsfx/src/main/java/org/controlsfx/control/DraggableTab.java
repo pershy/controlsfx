@@ -31,11 +31,15 @@ import java.util.concurrent.Callable;
 import javafx.beans.property.BooleanProperty;
 import javafx.beans.property.SimpleBooleanProperty;
 import javafx.beans.property.SimpleObjectProperty;
+import javafx.beans.value.ChangeListener;
+import javafx.beans.value.ObservableValue;
 import javafx.collections.ListChangeListener;
 import javafx.event.EventHandler;
 import javafx.geometry.Point2D;
 import javafx.geometry.Pos;
 import javafx.geometry.Rectangle2D;
+import javafx.scene.Node;
+import javafx.scene.Parent;
 import javafx.scene.Scene;
 import javafx.scene.control.Control;
 import javafx.scene.control.Label;
@@ -60,11 +64,11 @@ public class DraggableTab extends Tab {
 
     private static final Set<TabPane> tabPanes = new HashSet<>();
     private Label nameLabel;
-    private Text dragText;
+    private final Text dragText;
     private static final Stage markerStage;
-    private Stage dragStage;
-    private SimpleBooleanProperty detachableProperty;
-    private SimpleObjectProperty<Callable<Boolean>> callbackProperty;
+    private final Stage dragStage;
+    private final SimpleBooleanProperty detachableProperty;
+    private final SimpleObjectProperty<Callable<Boolean>> callbackProperty;
 
     static {
         markerStage = new Stage();
@@ -83,8 +87,8 @@ public class DraggableTab extends Tab {
      * @param text the text to appear on the tag label.
      */
     public DraggableTab(String text) {
-        nameLabel = new Label(text);
-        setGraphic(nameLabel);
+        super(text);
+        setupLabelRef();
         detachableProperty = new SimpleBooleanProperty(true);
         callbackProperty = new SimpleObjectProperty<>();
         dragStage = new Stage();
@@ -92,9 +96,121 @@ public class DraggableTab extends Tab {
         StackPane dragStagePane = new StackPane();
         dragStagePane.setStyle("-fx-background-color:#DDDDDD;");
         dragText = new Text(text);
+        dragText.textProperty().bind(textProperty());
         StackPane.setAlignment(dragText, Pos.CENTER);
         dragStagePane.getChildren().add(dragText);
         dragStage.setScene(new Scene(dragStagePane));
+    }
+
+    /**
+     * Set the callback that will be called upon attempting to move or detach
+     * this tab. If the callback returns false then the tab will be returned to
+     * its original position, if it returns true the drag operation will
+     * complete.
+     *
+     * @param callback the callback to execute to determine whether or not to
+     * move or detach this tab.
+     */
+    public final void setMoveCallback(Callable<Boolean> callback) {
+        callbackProperty.set(callback);
+    }
+
+    /**
+     * Get the callback that will be called upon attempting to move or detach
+     * this tab. If the callback returns false then the tab will be returned to
+     * its original position, if it returns true the drag operation will
+     * complete.
+     *
+     * @return the callback to execute to determine whether or not to move or
+     * detach this tab.
+     */
+    public final Callable<Boolean> getMoveCallback() {
+        return callbackProperty.get();
+    }
+
+    /**
+     * Specifies the callback that will be called upon attempting to move or
+     * detach this tab. If the callback returns false then the tab will be
+     * returned to its original position, if it returns true the drag operation
+     * will complete.
+     *
+     * @return the callback property.
+     */
+    public final SimpleObjectProperty<Callable<Boolean>> callbackProperty() {
+        return callbackProperty;
+    }
+
+    /**
+     * Set whether it's possible to detach the tab from its pane and move it to
+     * another pane or another window. Defaults to true.
+     * <p>
+     * @param detachable true if the tab should be detachable, false otherwise.
+     */
+    public final void setDetachable(boolean detachable) {
+        detachableProperty.set(detachable);
+    }
+
+    /**
+     * Determine whether it's possible to detach the tab from its pane and move
+     * it to another pane or another window.
+     * <p>
+     * @return the state of the detachable property.
+     */
+    public final boolean isDetachable() {
+        return detachableProperty.get();
+    }
+
+    /**
+     * Specifies whether it's possible to detach the tab from its pane and move
+     * it to another pane or another window. Defaults to true.
+     *
+     * @return the detachable property.
+     */
+    public final BooleanProperty detachableProperty() {
+        return detachableProperty;
+    }
+
+    private InsertData getInsertData(Point2D screenPoint) {
+        for (TabPane tabPane : tabPanes) {
+            Rectangle2D tabAbsolute = getAbsoluteRect(tabPane);
+            if (tabAbsolute.contains(screenPoint)) {
+                int tabInsertIndex = 0;
+                if (!tabPane.getTabs().isEmpty()) {
+                    Rectangle2D firstTabRect = getAbsoluteRect(tabPane.getTabs().get(0));
+                    if (firstTabRect.getMaxY() + 60 < screenPoint.getY() || firstTabRect.getMinY() > screenPoint.getY()) {
+                        return null;
+                    }
+                    Rectangle2D lastTabRect = getAbsoluteRect(tabPane.getTabs().get(tabPane.getTabs().size() - 1));
+                    if (screenPoint.getX() < (firstTabRect.getMinX() + firstTabRect.getWidth() / 2)) {
+                        tabInsertIndex = 0;
+                    } else if (screenPoint.getX() > (lastTabRect.getMaxX() - lastTabRect.getWidth() / 2)) {
+                        tabInsertIndex = tabPane.getTabs().size();
+                    } else {
+                        for (int i = 0; i < tabPane.getTabs().size() - 1; i++) {
+                            Tab leftTab = tabPane.getTabs().get(i);
+                            Tab rightTab = tabPane.getTabs().get(i + 1);
+                            if (leftTab instanceof DraggableTab && rightTab instanceof DraggableTab) {
+                                Rectangle2D leftTabRect = getAbsoluteRect(leftTab);
+                                Rectangle2D rightTabRect = getAbsoluteRect(rightTab);
+                                if (betweenX(leftTabRect, rightTabRect, screenPoint.getX())) {
+                                    tabInsertIndex = i + 1;
+                                    break;
+                                }
+                            }
+                        }
+                    }
+                }
+                return new InsertData(tabInsertIndex, tabPane);
+            }
+        }
+        return null;
+    }
+
+    private boolean useLabel(Label label) {
+        if (label == null) {
+            return false;
+        }
+        nameLabel = label;
         nameLabel.setOnMouseDragged(new EventHandler<MouseEvent>() {
 
             @Override
@@ -161,6 +277,7 @@ public class DraggableTab extends Tab {
                         }
                         insertData.getInsertPane().getTabs().add(addIndex, DraggableTab.this);
                         insertData.getInsertPane().selectionModelProperty().get().select(addIndex);
+                        setupLabelRef();
                         return;
                     }
                     if (!detachableProperty.get()) {
@@ -194,122 +311,60 @@ public class DraggableTab extends Tab {
                     newStage.show();
                     pane.requestLayout();
                     pane.requestFocus();
+                    setupLabelRef();
                 }
             }
-
         });
+        return true;
     }
 
-    /**
-     * Set the callback that will be called upon attempting to move or detach
-     * this tab. If the callback returns false then the tab will be returned to
-     * its original position, if it returns true the drag operation will
-     * complete.
-     *
-     * @param callback the callback to execute to determine whether or not to
-     * move or detach this tab.
-     */
-    public final void setMoveCallback(Callable<Boolean> callback) {
-        callbackProperty.set(callback);
-    }
+    private void setupLabelRef() {
+        if(getTabPane()==null) {
+            tabPaneProperty().addListener(new ChangeListener<TabPane>() {
 
-    /**
-     * Get the callback that will be called upon attempting to move or detach
-     * this tab. If the callback returns false then the tab will be returned to
-     * its original position, if it returns true the drag operation will
-     * complete.
-     *
-     * @return the callback to execute to determine whether or not to
-     * move or detach this tab.
-     */
-    public final Callable<Boolean> getMoveCallback() {
-        return callbackProperty.get();
+                @Override
+                public void changed(ObservableValue<? extends TabPane> ov, TabPane oldPane, final TabPane newPane) {
+                    setupUseLabelListeners(newPane);
+                    tabPaneProperty().removeListener(this);
+                }
+            });
+        }
+        else {
+            setupUseLabelListeners(getTabPane());
+        }
     }
+    
+    private void setupUseLabelListeners(final TabPane tabPane) {
+        Scene scene = tabPane.getScene();
+        if (scene != null) {
+            useLabel(getLabelFromSkin(tabPane.getSkin().getNode()));
+        }
+        if (nameLabel == null) {
+            tabPane.getChildrenUnmodifiable().addListener(new ListChangeListener<Node>() {
 
-    /**
-     * Specifies the callback that will be called upon attempting to move or
-     * detach this tab. If the callback returns false then the tab will be
-     * returned to its original position, if it returns true the drag operation
-     * will complete.
-     *
-     * @return the callback property.
-     */
-    public final SimpleObjectProperty<Callable<Boolean>> callbackProperty() {
-        return callbackProperty;
-    }
-
-    /**
-     * Set whether it's possible to detach the tab from its pane and move it to
-     * another pane or another window. Defaults to true.
-     * <p>
-     * @param detachable true if the tab should be detachable, false otherwise.
-     */
-    public final void setDetachable(boolean detachable) {
-        detachableProperty.set(detachable);
-    }
-
-    /**
-     * Determine whether it's possible to detach the tab from its pane and move
-     * it to another pane or another window.
-     * <p>
-     * @return the state of the detachable property.
-     */
-    public final boolean isDetachable() {
-        return detachableProperty.get();
-    }
-
-    /**
-     * Specifies whether it's possible to detach the tab from its pane and move
-     * it to another pane or another window. Defaults to true.
-     *
-     * @return the detachable property.
-     */
-    public final BooleanProperty detachableProperty() {
-        return detachableProperty;
-    }
-
-    /**
-     * Set the label text on this draggable tab. This must be used instead of
-     * setText() to set the label, otherwise weird side effects will result!
-     * <p>
-     * @param text the label text for this tab.
-     */
-    public void setLabelText(String text) {
-        nameLabel.setText(text);
-        dragText.setText(text);
-    }
-
-    private InsertData getInsertData(Point2D screenPoint) {
-        for (TabPane tabPane : tabPanes) {
-            Rectangle2D tabAbsolute = getAbsoluteRect(tabPane);
-            if (tabAbsolute.contains(screenPoint)) {
-                int tabInsertIndex = 0;
-                if (!tabPane.getTabs().isEmpty()) {
-                    Rectangle2D firstTabRect = getAbsoluteRect(tabPane.getTabs().get(0));
-                    if (firstTabRect.getMaxY() + 60 < screenPoint.getY() || firstTabRect.getMinY() > screenPoint.getY()) {
-                        return null;
-                    }
-                    Rectangle2D lastTabRect = getAbsoluteRect(tabPane.getTabs().get(tabPane.getTabs().size() - 1));
-                    if (screenPoint.getX() < (firstTabRect.getMinX() + firstTabRect.getWidth() / 2)) {
-                        tabInsertIndex = 0;
-                    } else if (screenPoint.getX() > (lastTabRect.getMaxX() - lastTabRect.getWidth() / 2)) {
-                        tabInsertIndex = tabPane.getTabs().size();
-                    } else {
-                        for (int i = 0; i < tabPane.getTabs().size() - 1; i++) {
-                            Tab leftTab = tabPane.getTabs().get(i);
-                            Tab rightTab = tabPane.getTabs().get(i + 1);
-                            if (leftTab instanceof DraggableTab && rightTab instanceof DraggableTab) {
-                                Rectangle2D leftTabRect = getAbsoluteRect(leftTab);
-                                Rectangle2D rightTabRect = getAbsoluteRect(rightTab);
-                                if (betweenX(leftTabRect, rightTabRect, screenPoint.getX())) {
-                                    tabInsertIndex = i + 1;
-                                    break;
-                                }
-                            }
-                        }
+                @Override
+                public void onChanged(ListChangeListener.Change<? extends Node> change) {
+                    if (useLabel(getLabelFromSkin(tabPane.getSkin().getNode()))) {
+                        tabPane.getChildrenUnmodifiable().removeListener(this);
                     }
                 }
-                return new InsertData(tabInsertIndex, tabPane);
+            });
+        }
+    }
+
+    private Label getLabelFromSkin(final Node p) {
+        if (p instanceof Label) {
+            Label label = (Label)p;
+            if (label.getText().equals(getText()) && label.getScene()!=null) {
+                return label;
+            }
+        }
+        if (p instanceof Parent) {
+            for (Node node : ((Parent) p).getChildrenUnmodifiable()) {
+                Label ret = getLabelFromSkin(node);
+                if(ret!=null) {
+                    return ret;
+                }
             }
         }
         return null;
@@ -323,12 +378,13 @@ public class DraggableTab extends Tab {
     }
 
     private Rectangle2D getAbsoluteRect(Tab tab) {
-        Control node = ((DraggableTab) tab).getLabel();
+        DraggableTab draggable = (DraggableTab)tab;
+        Control node = draggable.nameLabel;
+        if(node.getScene() == null) {
+            draggable.setupLabelRef();
+        }
+        node = draggable.nameLabel;
         return getAbsoluteRect(node);
-    }
-
-    private Label getLabel() {
-        return nameLabel;
     }
 
     private boolean betweenX(Rectangle2D r1, Rectangle2D r2, double xPoint) {
