@@ -26,7 +26,6 @@
  */
 package org.controlsfx.control.docking.model;
 
-import com.sun.javafx.event.EventHandlerManager;
 import java.util.List;
 import javafx.beans.InvalidationListener;
 import javafx.beans.property.ObjectProperty;
@@ -43,6 +42,7 @@ import javafx.event.Event;
 import javafx.event.EventDispatchChain;
 import javafx.event.EventTarget;
 import javafx.event.EventType;
+import javafx.geometry.Side;
 import javafx.scene.Node;
 import javafx.scene.control.ContextMenu;
 import org.controlsfx.control.docking.Dock;
@@ -326,7 +326,12 @@ public class DockTreeItem implements EventTarget {
      * @param text The title for this item 
      */
     public DockTreeItem(String text) {
+        this(text, null);
+    }
+    
+    public DockTreeItem(String text, Node content) {
         setText(text);
+        setContent(content);
         children.addListener(itemsListListener);
         children.addListener(childrenListener);
     }
@@ -511,6 +516,27 @@ public class DockTreeItem implements EventTarget {
     private final void setState(State value) { stateProperty().set(value);  }
     public final State getState() { return state.get(); }
     public final ObjectProperty<State> stateProperty() { return state; }
+    
+    // --- Collapse Side
+    private ObjectProperty<Side> side;
+    public final ObjectProperty<Side> sideProperty() {
+        if (side == null) {
+            side = new SimpleObjectProperty(this, "side");
+        }
+        return side;
+    }
+    public final void setSide(Side side) { sideProperty().set(side); }
+    /**
+     * The side to which this DockTreeItem will collpase to. By default,
+     * DockTreeItems will have the side of its parent.
+     * @return 
+     */
+    public final Side getSide() {
+        if (sideProperty().get() == null) {
+            return getParent().getSide();
+        }
+        return sideProperty().get();
+    }
     
     // --- dock mode
     private ObjectProperty<DockMode> dockMode = new ObjectPropertyBase<DockMode>(DockMode.DOCKED) {

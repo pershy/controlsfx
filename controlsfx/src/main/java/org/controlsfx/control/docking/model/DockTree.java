@@ -33,6 +33,7 @@ import javafx.beans.property.SimpleObjectProperty;
 import javafx.event.EventDispatchChain;
 import javafx.event.EventHandler;
 import javafx.event.EventType;
+import javafx.geometry.Side;
 
 /**
  * DockTree is the root DockTreeItem in the tree hierarchy of the Docking
@@ -55,7 +56,12 @@ public class DockTree extends DockTreeItem {
         }
         return left;
     }
-    public final void setLeft(DockTreeItem left) { leftProperty().set(left); }
+    public final void setLeft(DockTreeItem left) {
+        if (left != null) {
+            left.setSide(Side.LEFT);
+        }
+        leftProperty().set(left);
+    }
     public final DockTreeItem getLeft() { return leftProperty().get(); }
 
     // --- right
@@ -66,7 +72,12 @@ public class DockTree extends DockTreeItem {
         }
         return right;
     }
-    public final void setRight(DockTreeItem right) { rightProperty().set(right); }
+    public final void setRight(DockTreeItem right) {
+        if (right != null) {
+            right.setSide(Side.RIGHT);
+        }
+        rightProperty().set(right);
+    }
     public final DockTreeItem getRight() { return rightProperty().get(); }
 
     // --- center
@@ -77,7 +88,13 @@ public class DockTree extends DockTreeItem {
         }
         return center;
     }
-    public final void setCenter(DockTreeItem center) { centerProperty().set(center); }
+    public final void setCenter(DockTreeItem center) {
+        // By default center will collpase to LEFT
+        if (center != null) {
+            center.setSide(Side.LEFT);
+        }
+        centerProperty().set(center);
+    }
     public final DockTreeItem getCenter() { return centerProperty().get(); }
 
     // --- bottom
@@ -88,7 +105,12 @@ public class DockTree extends DockTreeItem {
         }
         return bottom;
     }
-    public final void setBottom(DockTreeItem bottom) { bottomProperty().set(bottom); }
+    public final void setBottom(DockTreeItem bottom) {
+        if (bottom != null) {
+            bottom.setSide(Side.BOTTOM);
+        }
+        bottomProperty().set(bottom);
+    }
     public final DockTreeItem getBottom() { return bottomProperty().get(); }
 
     /**
@@ -96,8 +118,7 @@ public class DockTree extends DockTreeItem {
      */
     public DockTree() {
         // For dev purpose we will have some default instantiations
-        this(new DockTreeItem("Left"), new DockTreeItem("Right"), 
-                new DockTreeItem("Center"), new DockTreeItem("Bottom"));
+        this(null, null, null, null);
     }
 
     /**
@@ -120,6 +141,26 @@ public class DockTree extends DockTreeItem {
         // We will not check null here. Will do it in View during layout
         centerContainer.getChildren().addAll(getCenter(), getBottom());
         getChildren().addAll(getLeft(), centerContainer, getRight());
+
+        leftProperty().addListener((ov, oldItem, newItem) -> {
+            getChildren().remove(oldItem);
+            getChildren().add(0, newItem);
+        });
+        
+        rightProperty().addListener((ov, oldItem, newItem) -> {
+            getChildren().remove(oldItem);
+            getChildren().add(2, newItem);
+        });
+        
+        centerProperty().addListener((ov, oldItem, newItem) -> {
+            centerContainer.getChildren().remove(oldItem);
+            centerContainer.getChildren().add(0, newItem);
+        });
+        
+        bottomProperty().addListener((ov, oldItem, newItem) -> {
+            centerContainer.getChildren().remove(oldItem);
+            centerContainer.getChildren().add(1, newItem);
+        });
     }
 
     // Event Management
@@ -149,6 +190,11 @@ public class DockTree extends DockTreeItem {
 
     @Override
     public EventDispatchChain buildEventDispatchChain(EventDispatchChain edc) {
-        return edc.append(eventHandlerManager);
+        // handler manager can be null because we start to do modifications 
+        // in constructor of DockTreeItem and we do not need those events anyway
+        if (eventHandlerManager != null) {
+            return edc.append(eventHandlerManager);
+        }
+        return edc;
     }
 }
