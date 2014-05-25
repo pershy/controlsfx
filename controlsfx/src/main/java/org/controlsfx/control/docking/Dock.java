@@ -43,6 +43,7 @@ import javafx.scene.layout.BorderPane;
 import javafx.scene.layout.Region;
 import org.controlsfx.control.docking.model.DockTree;
 import org.controlsfx.control.docking.model.DockTreeItem;
+import org.controlsfx.control.docking.model.DockTreeItem.DockMode;
 import org.controlsfx.control.docking.model.DockTreeItem.DockTreeChangeEvent;
 
 /**
@@ -97,7 +98,7 @@ public class Dock extends Region {
                                 .removeEventHandler(DockTreeItem.TREE_MODIFICATION_EVENT, 
                                         treeModificationEventHandler);
                     }
-                    layoutDockTreeItem(get(), null);
+                    setUpRootContainer(new DockArea(Dock.this, get()));
                     getDockTree()
                             .addEventHandler(DockTreeItem.TREE_MODIFICATION_EVENT,
                                     treeModificationEventHandler);
@@ -124,35 +125,34 @@ public class Dock extends Region {
         bottomSidePanel.setOrientation(Orientation.HORIZONTAL);
         getChildren().add(borderPane);
         setDockTree(tree);
-        layoutDockTreeItem(getDockTree(), null);
+    }
+    
+    private void setUpRootContainer(DockingContainer container) {
+        rootContainer = container;
+        borderPane.setCenter((Node) rootContainer.getViewComponent());
+        layoutDockTreeItem(rootContainer, getDockTree().getChildren());
     }
 
-    private void layoutDockTreeItem(DockTreeItem item, DockingContainer parent) {
-        if (item == null) {
+    private void layoutDockTreeItem(DockingContainer parent, List<DockTreeItem> items) {
+        if (items == null || parent == null) {
             return;
         }
-
-        boolean isCollapsed = item.getDockMode().equals(DockTreeItem.DockMode.COLLAPSED);
-        boolean isFloating = item.getDockMode().equals(DockTreeItem.DockMode.FLOATING);
-        if (isCollapsed || isFloating) {
-            return;
-        }
-        final DockingContainer container;
-        if (item.getState().equals(DockTreeItem.State.COMPLEX)) {
-            container = new DockArea(this, item);
-            if (parent == null) {
-                borderPane.setCenter((Node) container.getViewComponent());
-                rootContainer = container;
-            } else {
-                parent.getChildren().add(container);
+        List<DockingContainer> containers = new ArrayList<>();
+        items.stream().forEach((item) -> {
+            DockingContainer container;
+            boolean isCollapsed = item.getDockMode().equals(DockMode.COLLAPSED);
+            boolean isFloating = item.getDockMode().equals(DockMode.FLOATING);
+            if (!(isCollapsed || isFloating)) {
+                if (item.getState().equals(DockTreeItem.State.COMPLEX)) {
+                    container = new DockArea(this, item);
+                    layoutDockTreeItem(container, item.getChildren());
+                } else {
+                    container = new DockTab(this, item);
+                }
+                containers.add(container);
             }
-            item.getChildren().stream().forEach((treeItem) -> {
-                layoutDockTreeItem(treeItem, (DockArea) container);
-            });
-        } else {
-            container = new DockTab(this, item);
-            parent.getChildren().add(container);
-        }
+        });
+        parent.getChildren().setAll(containers);
     }
 
     // get container for a specific DockTreeItem
@@ -178,7 +178,7 @@ public class Dock extends Region {
     private void collapse(DockTreeItem item) {
         Side itemSide = item.getSide();
         List<Button> btnList = getButtonsOnSide(itemSide);
-
+        
         if (btnList == null || btnList.isEmpty()) {
             switch (itemSide) {
                 case LEFT:
@@ -208,9 +208,10 @@ public class Dock extends Region {
         getButtonsOnSide(itemSide).addAll(newBtns);
         // Relayout from Parent container
         // TODO Should move re-layout to single method
-        DockingContainer parentContainer = getContainerForItem(null, item.getParent());
+        DockTreeItem parentItem = item.getParent();
+        DockingContainer parentContainer = getContainerForItem(null, parentItem);
         parentContainer.getChildren().clear();
-        layoutDockTreeItem(item.getParent(), parentContainer);
+        layoutDockTreeItem(parentContainer, parentItem.getChildren());
     }
     
     private void expand(DockTreeItem item) {
@@ -244,9 +245,10 @@ public class Dock extends Region {
         }
         
         // Relayout from parent
-        DockingContainer parentContainer = getContainerForItem(null, item.getParent());
+        DockTreeItem parentItem = item.getParent();
+        DockingContainer parentContainer = getContainerForItem(null, parentItem);
         parentContainer.getChildren().clear();
-        layoutDockTreeItem(item.getParent(), parentContainer);
+        layoutDockTreeItem(parentContainer, parentItem.getChildren());
     }
 
     private List<DockTreeItem> collectSimpleItems(DockTreeItem parent) {

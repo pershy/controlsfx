@@ -112,6 +112,7 @@ class DockArea implements DockingContainer {
     @Override
     public final void updateView(DockTreeItem item) {
         splitPane.getItems().clear();
+        splitPane.setStyle("-fx-border: 5px; -fx-border-style: solid");
         tabPane = null;
         
         // Iterate through children of this container. Place all DockTabs into
