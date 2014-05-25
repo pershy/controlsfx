@@ -57,7 +57,7 @@ public class HelloDock extends ControlsFXSample {
         Button collapsebtn1 = new Button("Left 1");
         collapsebtn1.setOnAction(event -> left1.setDockMode(DockTreeItem.DockMode.COLLAPSED));
         Button collapsebtn2 = new Button("Left 2");
-        collapsebtn2.setOnAction(event -> left2.setDockMode(DockTreeItem.DockMode.COLLAPSED));
+        collapsebtn2.setOnAction(event -> left.setDockMode(DockTreeItem.DockMode.COLLAPSED));
         left1.setContent(collapsebtn1);
         left2.setContent(collapsebtn2);
         
