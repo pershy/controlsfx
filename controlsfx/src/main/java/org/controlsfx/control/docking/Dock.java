@@ -69,7 +69,7 @@ public class Dock extends Region {
         // TODO Listen for appropriate event types and layout only the 
         // item that was changed
         DockTreeItem affectedItem = (DockTreeItem) t.getSource();
-        if (t.getEventType().equals(DockTreeItem.DOCK_MODE_CHANGE_EVENT)) {
+        if (DockTreeItem.DOCK_MODE_CHANGE_EVENT == t.getEventType()) {
             switch (t.getNewMode()) {
                 case FLOATING:
                     // TODO
@@ -140,10 +140,10 @@ public class Dock extends Region {
         List<DockingContainer> containers = new ArrayList<>();
         items.stream().forEach((item) -> {
             DockingContainer container;
-            boolean isCollapsed = item.getDockMode().equals(DockMode.COLLAPSED);
-            boolean isFloating = item.getDockMode().equals(DockMode.FLOATING);
+            boolean isCollapsed = DockMode.COLLAPSED == item.getDockMode();
+            boolean isFloating = DockMode.FLOATING == item.getDockMode();
             if (!(isCollapsed || isFloating)) {
-                if (item.getState().equals(DockTreeItem.State.COMPLEX)) {
+                if (DockTreeItem.State.COMPLEX == item.getState()) {
                     container = new DockArea(this, item);
                     layoutDockTreeItem(container, item.getChildren());
                 } else {

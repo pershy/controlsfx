@@ -72,7 +72,7 @@ public class DockTab implements DockingContainer {
      * @param item
      */
     public DockTab(Dock dock, DockTreeItem item) {
-        if (item.getState().equals(DockTreeItem.State.COMPLEX)) {
+        if (DockTreeItem.State.COMPLEX == item.getState()) {
             throw new IllegalStateException("Cannot use COMPLEX DockTreeItem in a DockTab");
         }
         tab = new Tab();

@@ -58,10 +58,10 @@ class DockArea implements DockingContainer {
     private final ObservableList<DockingContainer> children = FXCollections.observableArrayList();
 
     private Orientation getOppositeOrientation(Orientation orientation) {
-        if (orientation.equals(Orientation.HORIZONTAL)) {
+        if (Orientation.HORIZONTAL == orientation) {
             return Orientation.VERTICAL;
         }
-        if (orientation.equals(Orientation.VERTICAL)) {
+        if (Orientation.VERTICAL == orientation) {
             return Orientation.HORIZONTAL;
         }
         return null;
