@@ -26,7 +26,6 @@
  */
 package org.controlsfx.control.docking;
 
-import javafx.beans.property.ObjectProperty;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
 import javafx.scene.control.Tab;
@@ -41,8 +40,6 @@ public class DockTab extends DockingContainer {
 
     // PRIVATE DECLARATIONS
     private Tab tab;
-
-    private ObjectProperty<DockTreeItem> dockTreeItem;
 
     /**
      * Constructor
