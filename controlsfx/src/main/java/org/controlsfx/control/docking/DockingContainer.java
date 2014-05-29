@@ -26,6 +26,8 @@
  */
 package org.controlsfx.control.docking;
 
+import javafx.beans.property.ObjectProperty;
+import javafx.beans.property.SimpleObjectProperty;
 import javafx.collections.ObservableList;
 import org.controlsfx.control.docking.model.DockTreeItem;
 
@@ -34,20 +36,23 @@ import org.controlsfx.control.docking.model.DockTreeItem;
  * DockingContainers will be used internally by the framework to layout view
  * components
  */
-public interface DockingContainer {
+public abstract class DockingContainer {
+    
+    private DockingContainer parent;
+    private ObjectProperty<DockTreeItem> dockTreeItem;
 
     /**
      * Update the view component that this container holds with data from the
      * model DockTreeItem
      * @param item Model using which the view will be updated
      */
-    public void updateView(DockTreeItem item);
+    public abstract void updateView(DockTreeItem item);
 
     /**
      * DockingContainer can contain many other DockingContainers as its children
      * @return Children of this container
      */
-    public ObservableList<DockingContainer> getChildren();
+    public abstract ObservableList<DockingContainer> getChildren();
 
     /**
      * Holds the actual control / Pane used by the view. This need not be a
@@ -55,11 +60,59 @@ public interface DockingContainer {
      * For example, Tab
      * @return The View object that this container holds.
      */
-    public Object getViewComponent();
+    public abstract Object getViewComponent();
+
+    /**
+     * Performs the necessary actions to collapse his container
+     */
+    public abstract void collapse();
+
+    /**
+     * Performs the necessary actions to collapse his container
+     */
+    public abstract void expand();
 
     /**
      * The DockTreeItem for which this container tries to create the view
      * @return The model DockTreeItem
      */
-    public DockTreeItem getDockTreeItem();
+    public ObjectProperty<DockTreeItem> dockTreeItemProperty() {
+        if (dockTreeItem == null) {
+            dockTreeItem = new SimpleObjectProperty<DockTreeItem>(this, "dockTreeItem") {
+                @Override
+                public void invalidated() {
+                    updateView(get());
+                }
+            };
+        }
+        return dockTreeItem;
+    }
+
+    public final void setDockTreeItem(DockTreeItem item) {
+        dockTreeItemProperty().set(item);
+    }
+
+    /**
+     * The DockTreeItem for which this container tries to create the view
+     * @return The model DockTreeItem
+     */
+    public final DockTreeItem getDockTreeItem() {
+        return dockTreeItemProperty().get();
+    }
+
+    /**
+     * Parent container of this container
+     * @return Parent container
+     */
+    public DockingContainer getParent() {
+        return parent;
+    }
+    
+    /**
+     * Parent container
+     * @param parent 
+     */
+    void setParent(DockingContainer parent) {
+        this.parent = parent;
+    }
 }

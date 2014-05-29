@@ -542,6 +542,32 @@ public class DockTreeItem implements EventTarget {
     private ObjectProperty<DockMode> dockMode = new ObjectPropertyBase<DockMode>(DockMode.DOCKED) {
         @Override
         public void invalidated() {
+            // If this item is COMPLEX, and it is COLLAPSED, all of its
+            // children are collapsed
+            if (DockMode.COLLAPSED == get() && !getChildren().isEmpty()) {
+                getChildren().stream().forEach((DockTreeItem item) -> {
+                    item.setDockMode(get());
+                });
+            }
+
+            // Check siblings of this item. If all siblings are COLLAPSED,
+            // parent must be collapsed.
+            DockTreeItem parent = getParent();
+            if (parent != null && DockMode.COLLAPSED == get()) {
+                int size = parent.getChildren()
+                        .filtered(item -> item.getDockMode() == get())
+                        .size();
+                if (size == parent.getChildren().size()) {
+                    parent.setDockMode(get());
+                }
+            // If this item is DOCKED, the parent must also be docked
+            // if it not already DOCKED
+            } else if (parent != null && DockMode.DOCKED == get()) {
+                if (parent.getDockMode() != get()) {
+                     parent.setDockMode(get());
+                }
+            }
+
             fireEvent(new DockTreeChangeEvent(DOCK_MODE_CHANGE_EVENT, DockTreeItem.this, get()));
         }
 
