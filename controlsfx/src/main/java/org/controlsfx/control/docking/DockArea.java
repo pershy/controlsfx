@@ -27,12 +27,12 @@
 package org.controlsfx.control.docking;
 
 import javafx.beans.property.ObjectProperty;
-import javafx.beans.property.ReadOnlyObjectWrapper;
 import javafx.collections.FXCollections;
 import javafx.collections.ListChangeListener;
 import javafx.collections.ObservableList;
 import javafx.geometry.Orientation;
 import javafx.scene.Node;
+import javafx.scene.Parent;
 import javafx.scene.control.SplitPane;
 import javafx.scene.control.Tab;
 import javafx.scene.control.TabPane;
@@ -46,22 +46,26 @@ import org.controlsfx.control.docking.model.DockTreeItem;
  * are placed into the TabPane. The TabPane in-turn will be placed into the 
  * SplitPane
  */
-class DockArea implements DockingContainer {
+class DockArea extends DockingContainer {
     
     private Dock dock;
     // root view component that contains the split pane and overlay
     private StackPane root;
     private SplitPane splitPane;
     private TabPane tabPane;
+    
+    private boolean isTabPaneAdded = false;
+    // Used when collapsing and expanding. Holds the position of the container
+    private int index;
     // Overlay container to show different indications during drop
     private StackPane overlay;
     private final ObservableList<DockingContainer> children = FXCollections.observableArrayList();
 
     private Orientation getOppositeOrientation(Orientation orientation) {
-        if (orientation.equals(Orientation.HORIZONTAL)) {
+        if (Orientation.HORIZONTAL == orientation) {
             return Orientation.VERTICAL;
         }
-        if (orientation.equals(Orientation.VERTICAL)) {
+        if (Orientation.VERTICAL == orientation) {
             return Orientation.HORIZONTAL;
         }
         return null;
@@ -70,10 +74,12 @@ class DockArea implements DockingContainer {
     private final ListChangeListener<DockingContainer> childListener = (ListChangeListener.Change<? extends DockingContainer> change) -> {
         while (change.next()) {
             change.getAddedSubList().stream()
-                    .filter((container) -> (container instanceof DockArea))
                     .forEach((container) -> {
-                        ((DockArea) container).setOrientation(getOppositeOrientation(getOrientation()));
-            });
+                        if (container instanceof DockArea) {
+                            ((DockArea) container).setOrientation(getOppositeOrientation(getOrientation()));
+                        }
+                        container.setParent(this);
+                    });
         }
         updateView(getDockTreeItem());
     };
@@ -99,6 +105,7 @@ class DockArea implements DockingContainer {
         this.dock = dock;
         root = new StackPane();
         splitPane = new SplitPane();
+        tabPane = new TabPane();
         overlay = new StackPane();
         overlay.setVisible(false);
         // TODO Add implemntation to show overlay. Currently I have rectangles
@@ -111,17 +118,20 @@ class DockArea implements DockingContainer {
 
     @Override
     public final void updateView(DockTreeItem item) {
+        // FIXME Add/Remove only the changed items to the view rather than
+        // clearing everything and adding again
         splitPane.getItems().clear();
-        splitPane.setStyle("-fx-border: 5px; -fx-border-style: solid");
-        tabPane = null;
+        tabPane.getTabs().clear();
+        isTabPaneAdded = false;
+        splitPane.setStyle("-fx-border-style: solid");
         
         // Iterate through children of this container. Place all DockTabs into
         // a TabPane and all other children into SplitPane
         getChildren().stream().forEach(container -> {
             if (container instanceof DockTab) {
-                if (tabPane == null) {
-                    tabPane = new TabPane();
+                if (!isTabPaneAdded) {
                     splitPane.getItems().add(tabPane);
+                    isTabPaneAdded = true;
                 }
                 tabPane.getTabs().add((Tab) container.getViewComponent());
             } else {
@@ -152,18 +162,17 @@ class DockArea implements DockingContainer {
         return root;
     }
 
-    private ReadOnlyObjectWrapper<DockTreeItem> treeItem;
-    public final ReadOnlyObjectWrapper<DockTreeItem> dockTreeItemProperty() {
-        if (treeItem == null) {
-            treeItem = new ReadOnlyObjectWrapper<>(this, "dockTreeItem");
-        }
-        return treeItem;
-    }
-    final void setDockTreeItem(DockTreeItem dockTreeItem) {
-        dockTreeItemProperty().set(dockTreeItem);
-    }
     @Override
-    public final DockTreeItem getDockTreeItem() {
-        return dockTreeItemProperty().get();
+    public void collapse() {
+        DockingContainer parent = getParent();
+        index = parent.getChildren().indexOf(this);
+        parent.getChildren().removeAll(this);
+        ((Parent) parent.getViewComponent()).layout();
+    }
+
+    @Override
+    public void expand() {
+        getParent().getChildren().add(index, this);
+        ((Parent) getParent().getViewComponent()).layout();
     }
 }

@@ -63,13 +63,14 @@ public class Dock extends Region {
     private final ToolBar bottomSidePanel;
     
     private final WeakHashMap<DockTreeItem, Button> weakButtonMap = new WeakHashMap<>();
-    
+    private final WeakHashMap<DockTreeItem, DockingContainer> weakContainerMap = new WeakHashMap<>();
+
     // Root listener to listen for changes in the model
     private final EventHandler<DockTreeChangeEvent> treeModificationEventHandler = t -> {
         // TODO Listen for appropriate event types and layout only the 
         // item that was changed
         DockTreeItem affectedItem = (DockTreeItem) t.getSource();
-        if (t.getEventType().equals(DockTreeItem.DOCK_MODE_CHANGE_EVENT)) {
+        if (DockTreeItem.DOCK_MODE_CHANGE_EVENT == t.getEventType()) {
             switch (t.getNewMode()) {
                 case FLOATING:
                     // TODO
@@ -140,15 +141,16 @@ public class Dock extends Region {
         List<DockingContainer> containers = new ArrayList<>();
         items.stream().forEach((item) -> {
             DockingContainer container;
-            boolean isCollapsed = item.getDockMode().equals(DockMode.COLLAPSED);
-            boolean isFloating = item.getDockMode().equals(DockMode.FLOATING);
+            boolean isCollapsed = DockMode.COLLAPSED == item.getDockMode();
+            boolean isFloating = DockMode.FLOATING == item.getDockMode();
             if (!(isCollapsed || isFloating)) {
-                if (item.getState().equals(DockTreeItem.State.COMPLEX)) {
+                if (DockTreeItem.State.COMPLEX == item.getState()) {
                     container = new DockArea(this, item);
                     layoutDockTreeItem(container, item.getChildren());
                 } else {
                     container = new DockTab(this, item);
                 }
+                weakContainerMap.put(item, container);
                 containers.add(container);
             }
         });
@@ -192,41 +194,30 @@ public class Dock extends Region {
                     break;
             }
         }
+        
+        // FIXME No need of a list here. We will have it until we make sure that
+        // everything is working as expected
         List<Button> newBtns = new ArrayList<>();
         if (item.getChildren().isEmpty()) {
             Button newBtn = createSidePanelButton(item);
             newBtns.add(newBtn);
             weakButtonMap.put(item, newBtn);
-        } else {
-            List<DockTreeItem> simpleItems = collectSimpleItems(item);
-            simpleItems.stream().forEach(simpleItem -> {
-                Button newBtn = createSidePanelButton(simpleItem);
-                newBtns.add(newBtn);
-                weakButtonMap.put(simpleItem, newBtn);
-            });
         }
         getButtonsOnSide(itemSide).addAll(newBtns);
-        // Relayout from Parent container
-        // TODO Should move re-layout to single method
-        DockTreeItem parentItem = item.getParent();
-        DockingContainer parentContainer = getContainerForItem(null, parentItem);
-        parentContainer.getChildren().clear();
-        layoutDockTreeItem(parentContainer, parentItem.getChildren());
+
+        DockingContainer container = weakContainerMap.get(item);
+        container.collapse();
     }
-    
+
     private void expand(DockTreeItem item) {
         Side itemSide = item.getSide();
         List<Button> btnsToRemove = new ArrayList<>();
+        // Only simple items will have button that has to be removed.
+        // Even when complex items are expanded, seperate events will be
+        // fired for each simple item within the complex item
         if (item.getChildren().isEmpty()) {
             btnsToRemove.add(weakButtonMap.get(item));
             weakButtonMap.remove(item);
-        } else {
-            List<DockTreeItem> simpleItems = collectSimpleItems(item);
-            simpleItems.stream().forEach(simpleItem -> {
-                Button btn = weakButtonMap.get(simpleItem);
-                btnsToRemove.add(btn);
-                weakButtonMap.remove(simpleItem);
-            });
         }
         getButtonsOnSide(itemSide).removeAll(btnsToRemove);
         List<Button> btnList = getButtonsOnSide(itemSide);
@@ -243,12 +234,9 @@ public class Dock extends Region {
                     break;
             }
         }
-        
-        // Relayout from parent
-        DockTreeItem parentItem = item.getParent();
-        DockingContainer parentContainer = getContainerForItem(null, parentItem);
-        parentContainer.getChildren().clear();
-        layoutDockTreeItem(parentContainer, parentItem.getChildren());
+
+        DockingContainer container = weakContainerMap.get(item);
+        container.expand();
     }
 
     private List<DockTreeItem> collectSimpleItems(DockTreeItem parent) {

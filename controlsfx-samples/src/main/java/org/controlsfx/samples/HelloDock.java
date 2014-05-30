@@ -45,25 +45,34 @@ public class HelloDock extends ControlsFXSample {
         DockTree tree = new DockTree();
         
         // --- center
-        DockTreeItem center = new DockTreeItem();
-        center.getChildren().add(new DockTreeItem("CENTER", new Label("Center")));
+        Button collapseCenter = new Button("Collapse Center");
+        DockTreeItem center = new DockTreeItem("CENTER", collapseCenter);
+        collapseCenter.setOnAction(event -> center.setDockMode(DockTreeItem.DockMode.COLLAPSED));
         tree.setCenter(center);
 
         // --- left
         DockTreeItem left = new DockTreeItem();
-
-        DockTreeItem left1 = new DockTreeItem("LEFT1");
-        DockTreeItem left2 = new DockTreeItem("LEFT2");
-        Button collapsebtn1 = new Button("Left 1");
-        collapsebtn1.setOnAction(event -> left1.setDockMode(DockTreeItem.DockMode.COLLAPSED));
-        Button collapsebtn2 = new Button("Left 2");
+        
+        DockTreeItem leftTop = new DockTreeItem();
+        DockTreeItem leftTop1 = new DockTreeItem("Collapse this");
+        DockTreeItem leftTop2 = new DockTreeItem("Collapse LEFT");
+        Button collapsebtn1 = new Button("Left 11");
+        collapsebtn1.setOnAction(event -> leftTop1.setDockMode(DockTreeItem.DockMode.COLLAPSED));
+        Button collapsebtn2 = new Button("Left 12");
         collapsebtn2.setOnAction(event -> left.setDockMode(DockTreeItem.DockMode.COLLAPSED));
-        left1.setContent(collapsebtn1);
-        left2.setContent(collapsebtn2);
+        leftTop1.setContent(collapsebtn1);
+        leftTop2.setContent(collapsebtn2);
+        leftTop.getChildren().addAll(leftTop1, leftTop2);
         
-        left.getChildren().addAll(left1, left2);
+        DockTreeItem leftBottom = new DockTreeItem();
+        DockTreeItem leftBottom1 = new DockTreeItem("LEFT21");
+        leftBottom1.setContent(new Label("Left 2"));
+        
+        leftBottom.getChildren().add(leftBottom1);
+        
+        left.getChildren().addAll(leftTop, leftBottom);
         tree.setLeft(left);
-        
+
         // --- bottom
         DockTreeItem bottom = new DockTreeItem();
         bottom.getChildren().add(new DockTreeItem("BOTTOM", new Label("Bottom")));

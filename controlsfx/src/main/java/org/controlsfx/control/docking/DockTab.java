@@ -26,44 +26,20 @@
  */
 package org.controlsfx.control.docking;
 
-import javafx.beans.property.ObjectProperty;
-import javafx.beans.property.SimpleObjectProperty;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
 import javafx.scene.control.Tab;
+import javafx.scene.control.TabPane;
 import org.controlsfx.control.docking.model.DockTreeItem;
 
 /**
  * Represents a Simple DockTree item in View as a Tab. This container will not 
  * have any children.
  */
-public class DockTab implements DockingContainer {
+public class DockTab extends DockingContainer {
 
     // PRIVATE DECLARATIONS
     private Tab tab;
-
-    private ObjectProperty<DockTreeItem> dockTreeItem;
-
-    public ObjectProperty<DockTreeItem> dockTreeItemProperty() {
-        if (dockTreeItem == null) {
-            dockTreeItem = new SimpleObjectProperty<DockTreeItem>(this, "dockTreeItem") {
-                @Override
-                public void invalidated() {
-                    updateView(get());
-                }
-            };
-        }
-        return dockTreeItem;
-    }
-
-    public final void setDockTreeItem(DockTreeItem item) {
-        dockTreeItemProperty().set(item);
-    }
-
-    @Override
-    public final DockTreeItem getDockTreeItem() {
-        return dockTreeItemProperty().get();
-    }
 
     /**
      * Constructor
@@ -72,7 +48,7 @@ public class DockTab implements DockingContainer {
      * @param item
      */
     public DockTab(Dock dock, DockTreeItem item) {
-        if (item.getState().equals(DockTreeItem.State.COMPLEX)) {
+        if (DockTreeItem.State.COMPLEX == item.getState()) {
             throw new IllegalStateException("Cannot use COMPLEX DockTreeItem in a DockTab");
         }
         tab = new Tab();
@@ -98,4 +74,15 @@ public class DockTab implements DockingContainer {
         return FXCollections.observableArrayList();
     }
 
+    @Override
+    public void collapse() {
+        getParent().getChildren().remove(this);
+    }
+
+    @Override
+    public void expand() {
+        getParent().getChildren().add(this);
+        TabPane pane = tab.getTabPane();
+        pane.getSelectionModel().select(tab);
+    }
 }
