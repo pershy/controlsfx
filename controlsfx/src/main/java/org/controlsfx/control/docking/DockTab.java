@@ -26,6 +26,7 @@
  */
 package org.controlsfx.control.docking;
 
+import java.util.List;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
 import javafx.scene.control.Tab;
@@ -56,7 +57,8 @@ public class DockTab extends DockingContainer {
     }
 
     @Override
-    public void updateView(DockTreeItem item) {
+    public void updateView(DockTreeItem item, List<? extends DockingContainer> addedItems, 
+            List<? extends DockingContainer> removedItems) {
         // Assuming that DockTreeItem is in SIMPLE State
         tab.setText(item.getText());
         tab.setContent(item.getContent());
@@ -76,12 +78,12 @@ public class DockTab extends DockingContainer {
 
     @Override
     public void collapse() {
-        getParent().getChildren().remove(this);
+        getParent().getChildren().removeAll(this);
     }
 
     @Override
     public void expand() {
-        getParent().getChildren().add(this);
+        getParent().getChildren().addAll(this);
         TabPane pane = tab.getTabPane();
         pane.getSelectionModel().select(tab);
     }

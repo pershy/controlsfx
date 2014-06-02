@@ -26,8 +26,10 @@
  */
 package org.controlsfx.control.docking;
 
+import java.util.List;
 import javafx.beans.property.ObjectProperty;
 import javafx.beans.property.SimpleObjectProperty;
+import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
 import org.controlsfx.control.docking.model.DockTreeItem;
 
@@ -45,8 +47,11 @@ public abstract class DockingContainer {
      * Update the view component that this container holds with data from the
      * model DockTreeItem
      * @param item Model using which the view will be updated
+     * @param addedItems Child containers that are added to this container
+     * @param removedItems Child containers that are removed from this container
      */
-    public abstract void updateView(DockTreeItem item);
+    public abstract void updateView(DockTreeItem item, 
+            List<? extends DockingContainer> addedItems, List<? extends DockingContainer> removedItems);
 
     /**
      * DockingContainer can contain many other DockingContainers as its children
@@ -81,7 +86,8 @@ public abstract class DockingContainer {
             dockTreeItem = new SimpleObjectProperty<DockTreeItem>(this, "dockTreeItem") {
                 @Override
                 public void invalidated() {
-                    updateView(get());
+                    updateView(get(), FXCollections.emptyObservableList(), 
+                            FXCollections.emptyObservableList());
                 }
             };
         }
