@@ -26,6 +26,9 @@
  */
 package org.controlsfx.control.docking;
 
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Comparator;
 import java.util.List;
 import javafx.beans.property.ObjectProperty;
 import javafx.beans.property.SimpleObjectProperty;
@@ -42,16 +45,17 @@ public abstract class DockingContainer {
     
     private DockingContainer parent;
     private ObjectProperty<DockTreeItem> dockTreeItem;
+    private int index;
 
     /**
      * Update the view component that this container holds with data from the
      * model DockTreeItem
      * @param item Model using which the view will be updated
-     * @param addedItems Child containers that are added to this container
-     * @param removedItems Child containers that are removed from this container
+     * @param addedContainers Child containers that are added to this container
+     * @param removedContainers Child containers that are removed from this container
      */
     public abstract void updateView(DockTreeItem item, 
-            List<? extends DockingContainer> addedItems, List<? extends DockingContainer> removedItems);
+            List<? extends DockingContainer> addedContainers, List<? extends DockingContainer> removedContainers);
 
     /**
      * DockingContainer can contain many other DockingContainers as its children
@@ -120,5 +124,36 @@ public abstract class DockingContainer {
      */
     void setParent(DockingContainer parent) {
         this.parent = parent;
+    }
+    
+    /**
+     * Index of this container in its parent
+     * @param index 
+     */
+    void setIndex(int index) {
+        this.index = index;
+    }
+    /**
+     * Index of this container in its parent
+     * @return 
+     */
+    int getIndex() {
+        return index;
+    }
+    
+    // The index in which the container has to be inserted into
+    // its parent's children list need not be the same as the index 
+    // of this container. For example, container with index 4 may
+    // be expanded first. In that case the container should be inserted
+    // in index zero of children list. This method calculates the index
+    // in which the container has to be inserted to the list
+    int getListIndexForContainer(DockingContainer container) {
+        List<DockingContainer> clone = new ArrayList<>(getParent().getChildren());
+        clone.add(container);
+        Comparator<DockingContainer> comp = (o1, o2) -> {
+            return o1.getIndex() < o2.getIndex() ? -1 : 1;
+        };
+        Collections.sort(clone, comp);
+        return clone.indexOf(container);
     }
 }

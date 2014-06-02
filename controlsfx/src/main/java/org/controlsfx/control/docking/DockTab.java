@@ -57,8 +57,8 @@ public class DockTab extends DockingContainer {
     }
 
     @Override
-    public void updateView(DockTreeItem item, List<? extends DockingContainer> addedItems, 
-            List<? extends DockingContainer> removedItems) {
+    public void updateView(DockTreeItem item, List<? extends DockingContainer> addedContainers, 
+            List<? extends DockingContainer> removedContainers) {
         // Assuming that DockTreeItem is in SIMPLE State
         tab.setText(item.getText());
         tab.setContent(item.getContent());
@@ -83,7 +83,8 @@ public class DockTab extends DockingContainer {
 
     @Override
     public void expand() {
-        getParent().getChildren().addAll(this);
+        int listIndex = getListIndexForContainer(this);
+        getParent().getChildren().add(listIndex, this);
         TabPane pane = tab.getTabPane();
         pane.getSelectionModel().select(tab);
     }

@@ -26,7 +26,11 @@
  */
 package org.controlsfx.control.docking;
 
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Comparator;
 import java.util.List;
+import java.util.stream.Collectors;
 import javafx.beans.property.ObjectProperty;
 import javafx.collections.FXCollections;
 import javafx.collections.ListChangeListener;
@@ -55,8 +59,7 @@ class DockArea extends DockingContainer {
     final private TabPane tabPane;
     
     private boolean isTabPaneAdded = false;
-    // Used when collapsing and expanding. Holds the position of the container
-    private int index;
+
     // Overlay container to show different indications during drop
     private StackPane overlay;
     private final ObservableList<DockingContainer> children = FXCollections.observableArrayList();
@@ -118,9 +121,9 @@ class DockArea extends DockingContainer {
 
     @Override
     public final void updateView(DockTreeItem item, 
-            List<? extends DockingContainer> addedItems, List<? extends DockingContainer> removedItems) {
-        if (!removedItems.isEmpty()) {
-            removedItems.stream().forEach((container) -> {
+            List<? extends DockingContainer> addedContainers, List<? extends DockingContainer> removedContainers) {
+        if (!removedContainers.isEmpty()) {
+            removedContainers.stream().forEach((container) -> {
                 if (container instanceof DockTab) {
                     tabPane.getTabs().remove((Tab) container.getViewComponent());
                 } else {
@@ -132,16 +135,17 @@ class DockArea extends DockingContainer {
                 isTabPaneAdded = false;
             }
         }
-        if (!addedItems.isEmpty()) {
-            addedItems.stream().forEach((container) -> {
+        if (!addedContainers.isEmpty()) {
+            addedContainers.stream().forEach((container) -> {
+                int listIndex = getChildren().indexOf(container);
                 if (container instanceof DockTab) {
                     if (!isTabPaneAdded) {
                         splitPane.getItems().add(tabPane);
                         isTabPaneAdded = true;
                     }
-                    tabPane.getTabs().add((Tab) container.getViewComponent());
+                    tabPane.getTabs().add(listIndex, (Tab) container.getViewComponent());
                 } else {
-                    splitPane.getItems().add((Node) container.getViewComponent());
+                    splitPane.getItems().add(listIndex, (Node) container.getViewComponent());
                 }
             });
         }
@@ -179,6 +183,7 @@ class DockArea extends DockingContainer {
 
     @Override
     public void expand() {
-        getParent().getChildren().addAll(this);
+        int listIndex = getListIndexForContainer(this);
+        getParent().getChildren().add(listIndex, this);
     }
 }
