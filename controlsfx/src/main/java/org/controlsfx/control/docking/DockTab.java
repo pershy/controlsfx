@@ -37,7 +37,7 @@ import org.controlsfx.control.docking.model.DockTreeItem;
  * Represents a Simple DockTree item in View as a Tab. This container will not 
  * have any children.
  */
-public class DockTab extends DockingContainer {
+class DockTab extends DockingContainer {
 
     // PRIVATE DECLARATIONS
     private Tab tab;
@@ -48,7 +48,7 @@ public class DockTab extends DockingContainer {
      * @param dock
      * @param item
      */
-    public DockTab(Dock dock, DockTreeItem item) {
+    DockTab(Dock dock, DockTreeItem item) {
         if (DockTreeItem.State.COMPLEX == item.getState()) {
             throw new IllegalStateException("Cannot use COMPLEX DockTreeItem in a DockTab");
         }
@@ -57,7 +57,7 @@ public class DockTab extends DockingContainer {
     }
 
     @Override
-    public void updateView(DockTreeItem item, List<? extends DockingContainer> addedContainers, 
+    void updateView(DockTreeItem item, List<? extends DockingContainer> addedContainers, 
             List<? extends DockingContainer> removedContainers) {
         // Assuming that DockTreeItem is in SIMPLE State
         tab.setText(item.getText());
@@ -66,23 +66,23 @@ public class DockTab extends DockingContainer {
     }
 
     @Override
-    public Object getViewComponent() {
+    Object getViewComponent() {
         return tab;
     }
 
     @Override
-    public ObservableList<DockingContainer> getChildren() {
+    ObservableList<DockingContainer> getChildren() {
         // Ideally DockTab should not have any children
         return FXCollections.observableArrayList();
     }
 
     @Override
-    public void collapse() {
+    void collapse() {
         getParent().getChildren().removeAll(this);
     }
 
     @Override
-    public void expand() {
+    void expand() {
         int listIndex = getListIndexForContainer(this);
         getParent().getChildren().add(listIndex, this);
         TabPane pane = tab.getTabPane();

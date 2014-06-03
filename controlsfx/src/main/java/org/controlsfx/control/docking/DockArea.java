@@ -26,11 +26,7 @@
  */
 package org.controlsfx.control.docking;
 
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.Comparator;
 import java.util.List;
-import java.util.stream.Collectors;
 import javafx.beans.property.ObjectProperty;
 import javafx.collections.FXCollections;
 import javafx.collections.ListChangeListener;
@@ -89,13 +85,13 @@ class DockArea extends DockingContainer {
     
 
     // Wrapper for SplitPane's orientation
-    public final ObjectProperty<Orientation> orientationProperty() {
+    final ObjectProperty<Orientation> orientationProperty() {
         return splitPane.orientationProperty();
     }
-    public void setOrientation(Orientation orientation) {
+    void setOrientation(Orientation orientation) {
         orientationProperty().set(orientation);
     }
-    public Orientation getOrientation() {
+    Orientation getOrientation() {
         return orientationProperty().get();
     }
             
@@ -104,7 +100,7 @@ class DockArea extends DockingContainer {
      * Default constructor
      * @param dock Dock to which this DockArea belongs
      */
-    public DockArea(Dock dock, DockTreeItem treeItem) {
+    DockArea(Dock dock, DockTreeItem treeItem) {
         this.dock = dock;
         root = new StackPane();
         splitPane = new SplitPane();
@@ -120,7 +116,7 @@ class DockArea extends DockingContainer {
     }
 
     @Override
-    public final void updateView(DockTreeItem item, 
+    final void updateView(DockTreeItem item, 
             List<? extends DockingContainer> addedContainers, List<? extends DockingContainer> removedContainers) {
         if (!removedContainers.isEmpty()) {
             removedContainers.stream().forEach((container) -> {
@@ -166,23 +162,23 @@ class DockArea extends DockingContainer {
     }
 
     @Override
-    public ObservableList<DockingContainer> getChildren() {
+    ObservableList<DockingContainer> getChildren() {
         return children;
     }
 
     @Override
-    public Object getViewComponent() {
+    Object getViewComponent() {
         return root;
     }
 
     @Override
-    public void collapse() {
+    void collapse() {
         DockingContainer parent = getParent();
         parent.getChildren().removeAll(this);
     }
 
     @Override
-    public void expand() {
+    void expand() {
         int listIndex = getListIndexForContainer(this);
         getParent().getChildren().add(listIndex, this);
     }

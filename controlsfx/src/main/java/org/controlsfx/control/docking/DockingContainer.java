@@ -41,7 +41,7 @@ import org.controlsfx.control.docking.model.DockTreeItem;
  * DockingContainers will be used internally by the framework to layout view
  * components
  */
-public abstract class DockingContainer {
+abstract class DockingContainer {
     
     private DockingContainer parent;
     private ObjectProperty<DockTreeItem> dockTreeItem;
@@ -54,14 +54,14 @@ public abstract class DockingContainer {
      * @param addedContainers Child containers that are added to this container
      * @param removedContainers Child containers that are removed from this container
      */
-    public abstract void updateView(DockTreeItem item, 
+    abstract void updateView(DockTreeItem item, 
             List<? extends DockingContainer> addedContainers, List<? extends DockingContainer> removedContainers);
 
     /**
      * DockingContainer can contain many other DockingContainers as its children
      * @return Children of this container
      */
-    public abstract ObservableList<DockingContainer> getChildren();
+    abstract ObservableList<DockingContainer> getChildren();
 
     /**
      * Holds the actual control / Pane used by the view. This need not be a
@@ -69,23 +69,23 @@ public abstract class DockingContainer {
      * For example, Tab
      * @return The View object that this container holds.
      */
-    public abstract Object getViewComponent();
+    abstract Object getViewComponent();
 
     /**
      * Performs the necessary actions to collapse his container
      */
-    public abstract void collapse();
+    abstract void collapse();
 
     /**
      * Performs the necessary actions to collapse his container
      */
-    public abstract void expand();
+    abstract void expand();
 
     /**
      * The DockTreeItem for which this container tries to create the view
      * @return The model DockTreeItem
      */
-    public ObjectProperty<DockTreeItem> dockTreeItemProperty() {
+    ObjectProperty<DockTreeItem> dockTreeItemProperty() {
         if (dockTreeItem == null) {
             dockTreeItem = new SimpleObjectProperty<DockTreeItem>(this, "dockTreeItem") {
                 @Override
@@ -98,7 +98,7 @@ public abstract class DockingContainer {
         return dockTreeItem;
     }
 
-    public final void setDockTreeItem(DockTreeItem item) {
+    final void setDockTreeItem(DockTreeItem item) {
         dockTreeItemProperty().set(item);
     }
 
@@ -106,7 +106,7 @@ public abstract class DockingContainer {
      * The DockTreeItem for which this container tries to create the view
      * @return The model DockTreeItem
      */
-    public final DockTreeItem getDockTreeItem() {
+    final DockTreeItem getDockTreeItem() {
         return dockTreeItemProperty().get();
     }
 
@@ -114,7 +114,7 @@ public abstract class DockingContainer {
      * Parent container of this container
      * @return Parent container
      */
-    public DockingContainer getParent() {
+    DockingContainer getParent() {
         return parent;
     }
     
