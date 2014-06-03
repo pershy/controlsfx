@@ -554,9 +554,9 @@ public class DockTreeItem implements EventTarget {
             // parent must be collapsed.
             DockTreeItem parent = getParent();
             if (parent != null && DockMode.COLLAPSED == get()) {
-                int size = parent.getChildren()
-                        .filtered(item -> item.getDockMode() == get())
-                        .size();
+                long size = parent.getChildren().stream()
+                        .filter(item -> item.getDockMode() == get())
+                        .count();
                 if (size == parent.getChildren().size()) {
                     parent.setDockMode(get());
                 }
@@ -568,7 +568,9 @@ public class DockTreeItem implements EventTarget {
                 }
             }
 
-            fireEvent(new DockTreeChangeEvent(DOCK_MODE_CHANGE_EVENT, DockTreeItem.this, get()));
+            if (parent != null) {
+                fireEvent(new DockTreeChangeEvent(DOCK_MODE_CHANGE_EVENT, DockTreeItem.this, get()));
+            }
         }
 
         @Override
@@ -596,7 +598,7 @@ public class DockTreeItem implements EventTarget {
      * Children of this DockTreeItem
      * @return All the children of this DockTreeItem
      */
-    public final ObservableList<DockTreeItem> getChildren() {
+    public ObservableList<DockTreeItem> getChildren() {
         return children;
     }
 
