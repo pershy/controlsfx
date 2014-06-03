@@ -56,7 +56,7 @@ public class Dock extends Region {
 
     private final BorderPane borderPane;
     private DockingContainer rootContainer;
-    
+
     // side panels
     private final ToolBar rightSidePanel;
     private final ToolBar leftSidePanel;
@@ -84,7 +84,7 @@ public class Dock extends Region {
             }
         }
     };
-    
+
     private WeakReference<DockTree> oldDockTree;
     
     // --- Dock Tree Property
@@ -152,6 +152,8 @@ public class Dock extends Region {
                 }
                 weakContainerMap.put(item, container);
                 containers.add(container);
+                // FIXME Indexing has to be done in children listener
+                container.setIndex(containers.size() - 1);
             }
         });
         parent.getChildren().setAll(containers);

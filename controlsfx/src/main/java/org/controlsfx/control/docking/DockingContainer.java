@@ -26,8 +26,13 @@
  */
 package org.controlsfx.control.docking;
 
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Comparator;
+import java.util.List;
 import javafx.beans.property.ObjectProperty;
 import javafx.beans.property.SimpleObjectProperty;
+import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
 import org.controlsfx.control.docking.model.DockTreeItem;
 
@@ -36,23 +41,27 @@ import org.controlsfx.control.docking.model.DockTreeItem;
  * DockingContainers will be used internally by the framework to layout view
  * components
  */
-public abstract class DockingContainer {
+abstract class DockingContainer {
     
     private DockingContainer parent;
     private ObjectProperty<DockTreeItem> dockTreeItem;
+    private int index;
 
     /**
      * Update the view component that this container holds with data from the
      * model DockTreeItem
      * @param item Model using which the view will be updated
+     * @param addedContainers Child containers that are added to this container
+     * @param removedContainers Child containers that are removed from this container
      */
-    public abstract void updateView(DockTreeItem item);
+    abstract void updateView(DockTreeItem item, 
+            List<? extends DockingContainer> addedContainers, List<? extends DockingContainer> removedContainers);
 
     /**
      * DockingContainer can contain many other DockingContainers as its children
      * @return Children of this container
      */
-    public abstract ObservableList<DockingContainer> getChildren();
+    abstract ObservableList<DockingContainer> getChildren();
 
     /**
      * Holds the actual control / Pane used by the view. This need not be a
@@ -60,35 +69,36 @@ public abstract class DockingContainer {
      * For example, Tab
      * @return The View object that this container holds.
      */
-    public abstract Object getViewComponent();
+    abstract Object getViewComponent();
 
     /**
      * Performs the necessary actions to collapse his container
      */
-    public abstract void collapse();
+    abstract void collapse();
 
     /**
      * Performs the necessary actions to collapse his container
      */
-    public abstract void expand();
+    abstract void expand();
 
     /**
      * The DockTreeItem for which this container tries to create the view
      * @return The model DockTreeItem
      */
-    public ObjectProperty<DockTreeItem> dockTreeItemProperty() {
+    ObjectProperty<DockTreeItem> dockTreeItemProperty() {
         if (dockTreeItem == null) {
             dockTreeItem = new SimpleObjectProperty<DockTreeItem>(this, "dockTreeItem") {
                 @Override
                 public void invalidated() {
-                    updateView(get());
+                    updateView(get(), FXCollections.emptyObservableList(), 
+                            FXCollections.emptyObservableList());
                 }
             };
         }
         return dockTreeItem;
     }
 
-    public final void setDockTreeItem(DockTreeItem item) {
+    final void setDockTreeItem(DockTreeItem item) {
         dockTreeItemProperty().set(item);
     }
 
@@ -96,7 +106,7 @@ public abstract class DockingContainer {
      * The DockTreeItem for which this container tries to create the view
      * @return The model DockTreeItem
      */
-    public final DockTreeItem getDockTreeItem() {
+    final DockTreeItem getDockTreeItem() {
         return dockTreeItemProperty().get();
     }
 
@@ -104,7 +114,7 @@ public abstract class DockingContainer {
      * Parent container of this container
      * @return Parent container
      */
-    public DockingContainer getParent() {
+    DockingContainer getParent() {
         return parent;
     }
     
@@ -114,5 +124,36 @@ public abstract class DockingContainer {
      */
     void setParent(DockingContainer parent) {
         this.parent = parent;
+    }
+    
+    /**
+     * Index of this container in its parent
+     * @param index 
+     */
+    void setIndex(int index) {
+        this.index = index;
+    }
+    /**
+     * Index of this container in its parent
+     * @return 
+     */
+    int getIndex() {
+        return index;
+    }
+    
+    // The index in which the container has to be inserted into
+    // its parent's children list need not be the same as the index 
+    // of this container. For example, container with index 4 may
+    // be expanded first. In that case the container should be inserted
+    // in index zero of children list. This method calculates the index
+    // in which the container has to be inserted to the list
+    int getListIndexForContainer(DockingContainer container) {
+        List<DockingContainer> clone = new ArrayList<>(getParent().getChildren());
+        clone.add(container);
+        Comparator<DockingContainer> comp = (o1, o2) -> {
+            return o1.getIndex() < o2.getIndex() ? -1 : 1;
+        };
+        Collections.sort(clone, comp);
+        return clone.indexOf(container);
     }
 }

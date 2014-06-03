@@ -26,13 +26,13 @@
  */
 package org.controlsfx.control.docking;
 
+import java.util.List;
 import javafx.beans.property.ObjectProperty;
 import javafx.collections.FXCollections;
 import javafx.collections.ListChangeListener;
 import javafx.collections.ObservableList;
 import javafx.geometry.Orientation;
 import javafx.scene.Node;
-import javafx.scene.Parent;
 import javafx.scene.control.SplitPane;
 import javafx.scene.control.Tab;
 import javafx.scene.control.TabPane;
@@ -50,13 +50,12 @@ class DockArea extends DockingContainer {
     
     private Dock dock;
     // root view component that contains the split pane and overlay
-    private StackPane root;
-    private SplitPane splitPane;
-    private TabPane tabPane;
+    final private StackPane root;
+    final private SplitPane splitPane;
+    final private TabPane tabPane;
     
     private boolean isTabPaneAdded = false;
-    // Used when collapsing and expanding. Holds the position of the container
-    private int index;
+
     // Overlay container to show different indications during drop
     private StackPane overlay;
     private final ObservableList<DockingContainer> children = FXCollections.observableArrayList();
@@ -80,19 +79,19 @@ class DockArea extends DockingContainer {
                         }
                         container.setParent(this);
                     });
+            updateView(getDockTreeItem(), change.getAddedSubList(), change.getRemoved());
         }
-        updateView(getDockTreeItem());
     };
     
 
     // Wrapper for SplitPane's orientation
-    public final ObjectProperty<Orientation> orientationProperty() {
+    final ObjectProperty<Orientation> orientationProperty() {
         return splitPane.orientationProperty();
     }
-    public void setOrientation(Orientation orientation) {
+    void setOrientation(Orientation orientation) {
         orientationProperty().set(orientation);
     }
-    public Orientation getOrientation() {
+    Orientation getOrientation() {
         return orientationProperty().get();
     }
             
@@ -101,7 +100,7 @@ class DockArea extends DockingContainer {
      * Default constructor
      * @param dock Dock to which this DockArea belongs
      */
-    public DockArea(Dock dock, DockTreeItem treeItem) {
+    DockArea(Dock dock, DockTreeItem treeItem) {
         this.dock = dock;
         root = new StackPane();
         splitPane = new SplitPane();
@@ -117,31 +116,40 @@ class DockArea extends DockingContainer {
     }
 
     @Override
-    public final void updateView(DockTreeItem item) {
-        // FIXME Add/Remove only the changed items to the view rather than
-        // clearing everything and adding again
-        splitPane.getItems().clear();
-        tabPane.getTabs().clear();
-        isTabPaneAdded = false;
-        splitPane.setStyle("-fx-border-style: solid");
-        
-        // Iterate through children of this container. Place all DockTabs into
-        // a TabPane and all other children into SplitPane
-        getChildren().stream().forEach(container -> {
-            if (container instanceof DockTab) {
-                if (!isTabPaneAdded) {
-                    splitPane.getItems().add(tabPane);
-                    isTabPaneAdded = true;
+    final void updateView(DockTreeItem item, 
+            List<? extends DockingContainer> addedContainers, List<? extends DockingContainer> removedContainers) {
+        if (!removedContainers.isEmpty()) {
+            removedContainers.stream().forEach((container) -> {
+                if (container instanceof DockTab) {
+                    tabPane.getTabs().remove((Tab) container.getViewComponent());
+                } else {
+                    splitPane.getItems().remove((Node) container.getViewComponent());
                 }
-                tabPane.getTabs().add((Tab) container.getViewComponent());
-            } else {
-                splitPane.getItems().add((Node) container.getViewComponent());
+            });
+            if (tabPane.getTabs().isEmpty()) {
+                splitPane.getItems().remove(tabPane);
+                isTabPaneAdded = false;
             }
-        });
+        }
+        if (!addedContainers.isEmpty()) {
+            addedContainers.stream().forEach((container) -> {
+                int listIndex = getChildren().indexOf(container);
+                if (container instanceof DockTab) {
+                    if (!isTabPaneAdded) {
+                        splitPane.getItems().add(tabPane);
+                        isTabPaneAdded = true;
+                    }
+                    tabPane.getTabs().add(listIndex, (Tab) container.getViewComponent());
+                } else {
+                    splitPane.getItems().add(listIndex, (Node) container.getViewComponent());
+                }
+            });
+        }
+
         // Keep divider position in equal distance for now
         // TODO use weight of DockTreeItem to determine the divider position
         double size = splitPane.getItems().size();
-        if (size > 0) {
+        if (size > 1) {
             double divPos = 1.0/size;
             double[] positions = new double[splitPane.getItems().size() - 1];
 
@@ -149,30 +157,29 @@ class DockArea extends DockingContainer {
                 positions[i -1] = i * divPos;
             }
             splitPane.setDividerPositions(positions);
+            splitPane.layout();
         }
     }
 
     @Override
-    public ObservableList<DockingContainer> getChildren() {
+    ObservableList<DockingContainer> getChildren() {
         return children;
     }
 
     @Override
-    public Object getViewComponent() {
+    Object getViewComponent() {
         return root;
     }
 
     @Override
-    public void collapse() {
+    void collapse() {
         DockingContainer parent = getParent();
-        index = parent.getChildren().indexOf(this);
         parent.getChildren().removeAll(this);
-        ((Parent) parent.getViewComponent()).layout();
     }
 
     @Override
-    public void expand() {
-        getParent().getChildren().add(index, this);
-        ((Parent) getParent().getViewComponent()).layout();
+    void expand() {
+        int listIndex = getListIndexForContainer(this);
+        getParent().getChildren().add(listIndex, this);
     }
 }
