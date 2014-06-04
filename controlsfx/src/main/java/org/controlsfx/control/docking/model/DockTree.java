@@ -30,6 +30,8 @@ package org.controlsfx.control.docking.model;
 import com.sun.javafx.event.EventHandlerManager;
 import javafx.beans.property.ObjectProperty;
 import javafx.beans.property.SimpleObjectProperty;
+import javafx.collections.FXCollections;
+import javafx.collections.ObservableList;
 import javafx.event.EventDispatchChain;
 import javafx.event.EventHandler;
 import javafx.event.EventType;
@@ -138,28 +140,37 @@ public class DockTree extends DockTreeItem {
         setCenter(center);
         setBottom(bottom);
 
-        // We will not check null here. Will do it in View during layout
-        centerContainer.getChildren().addAll(getCenter(), getBottom());
-        getChildren().addAll(getLeft(), centerContainer, getRight());
+        centerContainer.setSide(Side.LEFT);
+        super.getChildren().add(centerContainer);
 
         leftProperty().addListener((ov, oldItem, newItem) -> {
-            getChildren().remove(oldItem);
-            getChildren().add(0, newItem);
+            super.getChildren().remove(oldItem);
+            if (newItem != null) {
+                super.getChildren().add(0, newItem);
+            }
         });
         
         rightProperty().addListener((ov, oldItem, newItem) -> {
-            getChildren().remove(oldItem);
-            getChildren().add(2, newItem);
+            super.getChildren().remove(oldItem);
+            if (newItem != null) {
+                int index = super.getChildren().size();
+                super.getChildren().add(index, newItem);
+            }
         });
         
         centerProperty().addListener((ov, oldItem, newItem) -> {
             centerContainer.getChildren().remove(oldItem);
-            centerContainer.getChildren().add(0, newItem);
+            if (newItem != null) {
+                centerContainer.getChildren().add(0, newItem);
+            }
         });
         
         bottomProperty().addListener((ov, oldItem, newItem) -> {
             centerContainer.getChildren().remove(oldItem);
-            centerContainer.getChildren().add(1, newItem);
+            if (newItem != null) {
+                int index = centerContainer.getChildren().size();
+                centerContainer.getChildren().add(index, newItem);
+            }
         });
     }
 
@@ -196,5 +207,10 @@ public class DockTree extends DockTreeItem {
             return edc.append(eventHandlerManager);
         }
         return edc;
+    }
+    
+    @Override
+    public final ObservableList<DockTreeItem> getChildren() {
+        return FXCollections.unmodifiableObservableList(super.getChildren());
     }
 }
