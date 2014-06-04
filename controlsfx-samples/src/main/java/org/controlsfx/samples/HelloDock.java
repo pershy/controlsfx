@@ -2,7 +2,6 @@ package org.controlsfx.samples;
 
 import javafx.scene.Node;
 import javafx.scene.control.Button;
-import javafx.scene.control.Label;
 import javafx.scene.layout.StackPane;
 import javafx.stage.Stage;
 
@@ -72,14 +71,18 @@ public class HelloDock extends ControlsFXSample {
         tree.setLeft(left);
 
         // --- bottom
-        DockTreeItem bottom = new DockTreeItem("BOTTOM PARENT");
-        bottom.getChildren().add(new DockTreeItem("BOTTOM", new Label("Bottom")));
-        tree.setBottom(bottom);
+        DockTreeItem bottomParent = new DockTreeItem("BOTTOM PARENT");
+        DockTreeItem bottom = new DockTreeItem("BOTTOM");
+        bottom.setContent(getCollapseButton(bottom));
+        bottomParent.getChildren().add(bottom);
+        tree.setBottom(bottomParent);
         
         // --- right
-        DockTreeItem right = new DockTreeItem("RIGHT PARENT");
-        right.getChildren().add(new DockTreeItem("RIGHT", new Label("Right")));
-        tree.setRight(right);
+        DockTreeItem rightParent = new DockTreeItem("RIGHT PARENT");
+        DockTreeItem right = new DockTreeItem("RIGHT");
+        right.setContent(getCollapseButton(right));
+        rightParent.getChildren().add(right);
+        tree.setRight(rightParent);
         
         return tree;
     }

@@ -28,6 +28,7 @@ package org.controlsfx.control.docking;
 
 import java.lang.ref.WeakReference;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.WeakHashMap;
 import javafx.beans.property.ObjectProperty;
@@ -82,6 +83,18 @@ public class Dock extends Region {
                     expand(affectedItem);
                     break;
             }
+        } else if (DockTreeItem.CHILDREN_MODIFICATION_EVENT == t.getEventType()) {
+            t.getRemovedItems().stream().forEach(item -> {
+                DockingContainer container = weakContainerMap.get(item);
+                DockingContainer parentContainer = container.getParent();
+                parentContainer.getChildren().remove(container);
+            });
+
+            t.getAddedItems().stream().forEach(item -> {
+                DockTreeItem parent = item.getParent();
+                DockingContainer parentContainer = weakContainerMap.get(parent);
+                layoutDockTreeItem(parentContainer, Collections.singletonList(item));
+            });
         }
     };
 
@@ -138,8 +151,10 @@ public class Dock extends Region {
         if (items == null || parent == null) {
             return;
         }
-        List<DockingContainer> containers = new ArrayList<>();
         items.stream().forEach((item) -> {
+            if (item == null) {
+                throw new NullPointerException("Null item found in DockTree or its children");
+            }
             DockingContainer container;
             boolean isCollapsed = DockMode.COLLAPSED == item.getDockMode();
             boolean isFloating = DockMode.FLOATING == item.getDockMode();
@@ -151,12 +166,12 @@ public class Dock extends Region {
                     container = new DockTab(this, item);
                 }
                 weakContainerMap.put(item, container);
-                containers.add(container);
-                // FIXME Indexing has to be done in children listener
-                container.setIndex(containers.size() - 1);
+                DockTreeItem curParent = item.getParent();
+                int index = curParent.getChildren().indexOf(item);
+                container.setIndex(index);
+                parent.getChildren().add(index, container);
             }
         });
-        parent.getChildren().setAll(containers);
     }
 
     // get container for a specific DockTreeItem
