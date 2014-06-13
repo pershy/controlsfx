@@ -2,6 +2,9 @@ package org.controlsfx.samples;
 
 import javafx.scene.Node;
 import javafx.scene.control.Button;
+import javafx.scene.control.TreeCell;
+import javafx.scene.control.TreeItem;
+import javafx.scene.control.TreeView;
 import javafx.scene.layout.StackPane;
 import javafx.stage.Stage;
 
@@ -13,6 +16,8 @@ import org.controlsfx.control.docking.model.DockTreeItem;
 /**
  */
 public class HelloDock extends ControlsFXSample {
+    
+    private DockTree tree = null;
     
     public static void main(String[] args) {
         launch(args);
@@ -31,7 +36,7 @@ public class HelloDock extends ControlsFXSample {
     }
     
     @Override public Node getPanel(Stage stage) {
-        DockTree tree = buildDockTree();
+        tree = buildDockTree();
         Dock dock = new Dock(tree);
 
         StackPane root = new StackPane();
@@ -41,14 +46,14 @@ public class HelloDock extends ControlsFXSample {
     }
     
     private DockTree buildDockTree() {
-        DockTree tree = new DockTree();
+        DockTree dockTree = new DockTree();
         
         // --- center
         DockTreeItem center = new DockTreeItem("CENTER");
         center.setContent(getCollapseButton(center));
         DockTreeItem centerParent = new DockTreeItem("CENTER PARENT");
         centerParent.getChildren().addAll(center);
-        tree.setCenter(centerParent);
+        dockTree.setCenter(centerParent);
 
         // --- left
         DockTreeItem left = new DockTreeItem("LEFT PARENT");
@@ -68,37 +73,66 @@ public class HelloDock extends ControlsFXSample {
         leftBottom.getChildren().addAll(leftBottom1);
         
         left.getChildren().addAll(leftTop, leftBottom);
-        tree.setLeft(left);
+        dockTree.setLeft(left);
 
         // --- bottom
         DockTreeItem bottomParent = new DockTreeItem("BOTTOM PARENT");
         DockTreeItem bottom = new DockTreeItem("BOTTOM");
         bottom.setContent(getCollapseButton(bottom));
         bottomParent.getChildren().add(bottom);
-        tree.setBottom(bottomParent);
+        dockTree.setBottom(bottomParent);
         
         // --- right
         DockTreeItem rightParent = new DockTreeItem("RIGHT PARENT");
         DockTreeItem right = new DockTreeItem("RIGHT");
         right.setContent(getCollapseButton(right));
         rightParent.getChildren().add(right);
-        tree.setRight(rightParent);
+        dockTree.setRight(rightParent);
         
-        return tree;
+        return dockTree;
     }
     
     @Override public String getSampleDescription() {
-        return "";
+        return "Docking Framework";
     }
 
     @Override public Node getControlPanel() {
-        return null;
+        TreeView<DockTreeItem> traceTree = new TreeView<>(buildTree(tree));
+        traceTree.setCellFactory((TreeView<DockTreeItem> p) -> new CustomCell());
+        return traceTree;
     }
     
     private Button getCollapseButton(DockTreeItem item) {
         Button btn = new Button("Collapse");
         btn.setOnAction(event -> item.setDockMode(DockTreeItem.DockMode.COLLAPSED));
         return btn;
+    }
+
+    private TreeItem buildTree(DockTreeItem parent) {
+        TreeItem<DockTreeItem> item = new TreeItem<>();
+        item.setExpanded(true);
+        item.setValue(parent);
+        if (!parent.getChildren().isEmpty()) {
+            parent.getChildren().forEach(child -> {
+                TreeItem childItem = buildTree(child);
+                item.getChildren().add(childItem);
+            });
+        }
+        return item;
+    }
+    
+    private final class CustomCell extends TreeCell<DockTreeItem> {
+        @Override
+        public void updateItem(DockTreeItem item, boolean empty) {
+            super.updateItem(item, empty);
+            if (empty) {
+                setText(null);
+                setGraphic(null);
+            } else {
+                setText(item.getText());
+                setGraphic(item.getGraphic());
+            }
+        }
     }
 
 }
