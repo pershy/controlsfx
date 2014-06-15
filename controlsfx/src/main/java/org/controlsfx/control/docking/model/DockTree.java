@@ -28,9 +28,12 @@
 package org.controlsfx.control.docking.model;
 
 import com.sun.javafx.event.EventHandlerManager;
-import javafx.beans.property.ObjectProperty;
-import javafx.beans.property.SimpleObjectProperty;
+import javafx.beans.InvalidationListener;
+import javafx.beans.Observable;
+import javafx.beans.property.ReadOnlyObjectProperty;
+import javafx.beans.property.ReadOnlyObjectWrapper;
 import javafx.collections.FXCollections;
+import javafx.collections.ListChangeListener;
 import javafx.collections.ObservableList;
 import javafx.event.EventDispatchChain;
 import javafx.event.EventHandler;
@@ -47,73 +50,64 @@ import javafx.geometry.Side;
  */
 public class DockTree extends DockTreeItem {
 
-    private final DockTreeItem centerContainer = new DockTreeItem();
+    private final DockTreeItem centerContainer = new DockTreeItem("CENTER PARENT");
 
     // properties
     // --- left
-    private ObjectProperty<DockTreeItem> left;
-    public final ObjectProperty<DockTreeItem> leftProperty() {
+    private ReadOnlyObjectWrapper<DockTreeItem> left;
+    public final ReadOnlyObjectProperty<DockTreeItem> leftProperty() {
         if (left == null) {
-            left = new SimpleObjectProperty<>(this, "left");
+            DockTreeItem leftItem = new DockTreeItem("LEFT");
+            leftItem.setSide(Side.LEFT);
+            left = new ReadOnlyObjectWrapper<>(this, "left", leftItem);
         }
-        return left;
+        return left.getReadOnlyProperty();
     }
-    public final void setLeft(DockTreeItem left) {
-        if (left != null) {
-            left.setSide(Side.LEFT);
-        }
-        leftProperty().set(left);
+    public final DockTreeItem getLeft() {
+        return leftProperty().get();
     }
-    public final DockTreeItem getLeft() { return leftProperty().get(); }
 
     // --- right
-    private ObjectProperty<DockTreeItem> right;
-    public final ObjectProperty<DockTreeItem> rightProperty() {
+    private ReadOnlyObjectWrapper<DockTreeItem> right;
+    public final ReadOnlyObjectProperty<DockTreeItem> rightProperty() {
         if (right == null) {
-            right = new SimpleObjectProperty<>(this, "right");
+            DockTreeItem rightItem = new DockTreeItem("RIGHT");
+            rightItem.setSide(Side.RIGHT);
+            right = new ReadOnlyObjectWrapper<>(this, "right", rightItem);
         }
-        return right;
+        return right.getReadOnlyProperty();
     }
-    public final void setRight(DockTreeItem right) {
-        if (right != null) {
-            right.setSide(Side.RIGHT);
-        }
-        rightProperty().set(right);
+    public final DockTreeItem getRight() {
+        return rightProperty().get();
     }
-    public final DockTreeItem getRight() { return rightProperty().get(); }
 
     // --- center
-    private ObjectProperty<DockTreeItem> center;
-    public final ObjectProperty<DockTreeItem> centerProperty() {
+    private ReadOnlyObjectWrapper<DockTreeItem> center;
+    public final ReadOnlyObjectProperty<DockTreeItem> centerProperty() {
         if (center == null) {
-            center = new SimpleObjectProperty<>(this, "center");
+            DockTreeItem centerItem = new DockTreeItem("CENTER");
+            centerItem.setSide(Side.LEFT);
+            center = new ReadOnlyObjectWrapper<>(this, "center", centerItem);
         }
-        return center;
+        return center.getReadOnlyProperty();
     }
-    public final void setCenter(DockTreeItem center) {
-        // By default center will collpase to LEFT
-        if (center != null) {
-            center.setSide(Side.LEFT);
-        }
-        centerProperty().set(center);
+    public final DockTreeItem getCenter() {
+        return centerProperty().get();
     }
-    public final DockTreeItem getCenter() { return centerProperty().get(); }
 
     // --- bottom
-    private ObjectProperty<DockTreeItem> bottom;
-    public final ObjectProperty<DockTreeItem> bottomProperty() {
+    private ReadOnlyObjectWrapper<DockTreeItem> bottom;
+    public final ReadOnlyObjectProperty<DockTreeItem> bottomProperty() {
         if (bottom == null) {
-            bottom = new SimpleObjectProperty<>(this, "bottom");
+            DockTreeItem bottomItem = new DockTreeItem("BOTTOM");
+            bottomItem.setSide(Side.BOTTOM);
+            bottom = new ReadOnlyObjectWrapper<>(this, "bottom", bottomItem);
         }
-        return bottom;
+        return bottom.getReadOnlyProperty();
     }
-    public final void setBottom(DockTreeItem bottom) {
-        if (bottom != null) {
-            bottom.setSide(Side.BOTTOM);
-        }
-        bottomProperty().set(bottom);
+    public final DockTreeItem getBottom() {
+        return bottomProperty().get();
     }
-    public final DockTreeItem getBottom() { return bottomProperty().get(); }
 
     /**
      * Constructs a default instance of DockTree
@@ -135,41 +129,57 @@ public class DockTree extends DockTreeItem {
      */
     public DockTree(DockTreeItem left, DockTreeItem right, DockTreeItem center, 
             DockTreeItem bottom) {
-        setLeft(left);
-        setRight(right);
-        setCenter(center);
-        setBottom(bottom);
-
+        setText("DOCK TREE");
         centerContainer.setSide(Side.LEFT);
         super.getChildren().add(centerContainer);
 
-        leftProperty().addListener((ov, oldItem, newItem) -> {
-            super.getChildren().remove(oldItem);
-            if (newItem != null) {
-                super.getChildren().add(0, newItem);
+        if (left != null) {
+            leftProperty().get().getChildren().add(left);
+        }
+
+        if (right != null) {
+            rightProperty().get().getChildren().add(right);
+        }
+
+        if (center != null) {
+            centerProperty().get().getChildren().add(center);
+        }
+
+        if (bottom != null) {
+            bottomProperty().get().getChildren().add(bottom);
+        }
+        
+        leftProperty().get().getChildren().addListener((Observable o) -> {
+            if (getLeft().getChildren().isEmpty()) {
+                super.getChildren().remove(getLeft());
+            } else if (!super.getChildren().contains(getLeft())) {
+                super.getChildren().add(0, getLeft());
             }
         });
-        
-        rightProperty().addListener((ov, oldItem, newItem) -> {
-            super.getChildren().remove(oldItem);
-            if (newItem != null) {
+
+        rightProperty().get().getChildren().addListener((Observable o) -> {
+            if (getRight().getChildren().isEmpty()) {
+                super.getChildren().remove(getRight());
+            } else if (!super.getChildren().contains(getRight())) {
                 int index = super.getChildren().size();
-                super.getChildren().add(index, newItem);
+                super.getChildren().add(index, getRight());
             }
         });
         
-        centerProperty().addListener((ov, oldItem, newItem) -> {
-            centerContainer.getChildren().remove(oldItem);
-            if (newItem != null) {
-                centerContainer.getChildren().add(0, newItem);
+        centerProperty().get().getChildren().addListener((Observable o) -> {
+            if (getCenter().getChildren().isEmpty()) {
+                centerContainer.getChildren().remove(getCenter());
+            } else if (!super.getChildren().contains(getCenter())) {
+                centerContainer.getChildren().add(0, getCenter());
             }
         });
         
-        bottomProperty().addListener((ov, oldItem, newItem) -> {
-            centerContainer.getChildren().remove(oldItem);
-            if (newItem != null) {
+        bottomProperty().get().getChildren().addListener((Observable o) -> {
+            if (getCenter().getChildren().isEmpty()) {
+                centerContainer.getChildren().remove(getBottom());
+            } else if (!super.getChildren().contains(getBottom())) {
                 int index = centerContainer.getChildren().size();
-                centerContainer.getChildren().add(index, newItem);
+                centerContainer.getChildren().add(index, getBottom());
             }
         });
     }
