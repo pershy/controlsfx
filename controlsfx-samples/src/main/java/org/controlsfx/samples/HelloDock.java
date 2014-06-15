@@ -47,24 +47,21 @@ public class HelloDock extends ControlsFXSample {
     
     private DockTree buildDockTree() {
         DockTree dockTree = new DockTree();
-        
+
         // --- center
         DockTreeItem center = new DockTreeItem("CENTER");
         center.setContent(getCollapseButton(center));
         DockTreeItem centerParent = new DockTreeItem("CENTER PARENT");
         centerParent.getChildren().addAll(center);
-        dockTree.setCenter(centerParent);
+        dockTree.getCenter().getChildren().add(centerParent);
 
         // --- left
-        DockTreeItem left = new DockTreeItem("LEFT PARENT");
-        
-        DockTreeItem leftTop = new DockTreeItem("LEFT TOP");
+
         DockTreeItem leftTop1 = new DockTreeItem("LEFT TOP 1");
         DockTreeItem leftTop2 = new DockTreeItem("LEFT TOP 2");
 
         leftTop1.setContent(getCollapseButton(leftTop1));
         leftTop2.setContent(getCollapseButton(leftTop2));
-        leftTop.getChildren().addAll(leftTop1, leftTop2);
         
         DockTreeItem leftBottom = new DockTreeItem("LEFT BOT");
         DockTreeItem leftBottom1 = new DockTreeItem("LEFT BOT 1");
@@ -72,22 +69,19 @@ public class HelloDock extends ControlsFXSample {
         
         leftBottom.getChildren().addAll(leftBottom1);
         
-        left.getChildren().addAll(leftTop, leftBottom);
-        dockTree.setLeft(left);
+        dockTree.getLeft().getChildren().addAll(leftTop1, leftTop2, leftBottom);
 
         // --- bottom
         DockTreeItem bottomParent = new DockTreeItem("BOTTOM PARENT");
         DockTreeItem bottom = new DockTreeItem("BOTTOM");
         bottom.setContent(getCollapseButton(bottom));
         bottomParent.getChildren().add(bottom);
-        dockTree.setBottom(bottomParent);
+        dockTree.getBottom().getChildren().add(bottomParent);
         
         // --- right
-        DockTreeItem rightParent = new DockTreeItem("RIGHT PARENT");
         DockTreeItem right = new DockTreeItem("RIGHT");
         right.setContent(getCollapseButton(right));
-        rightParent.getChildren().add(right);
-        dockTree.setRight(rightParent);
+        dockTree.getRight().getChildren().add(right);
         
         return dockTree;
     }
