@@ -26,7 +26,9 @@
  */
 package org.controlsfx.control.docking;
 
+import java.util.ArrayList;
 import java.util.List;
+import javafx.beans.Observable;
 import javafx.beans.property.ObjectProperty;
 import javafx.collections.FXCollections;
 import javafx.collections.ListChangeListener;
@@ -55,6 +57,7 @@ class DockArea extends DockingContainer {
     final private TabPane tabPane;
     
     private boolean isTabPaneAdded = false;
+    private boolean isSplitPaneModified = false;
 
     // Overlay container to show different indications during drop
     private StackPane overlay;
@@ -104,6 +107,9 @@ class DockArea extends DockingContainer {
         this.dock = dock;
         root = new StackPane();
         splitPane = new SplitPane();
+        splitPane.getItems().addListener((Observable o) -> {
+            isSplitPaneModified = true;
+        });
         tabPane = new TabPane();
         overlay = new StackPane();
         overlay.setVisible(false);
@@ -136,28 +142,88 @@ class DockArea extends DockingContainer {
                 int listIndex = getChildren().indexOf(container);
                 if (container instanceof DockTab) {
                     if (!isTabPaneAdded) {
-                        splitPane.getItems().add(tabPane);
+                        splitPane.getItems().add(listIndex, tabPane);
                         isTabPaneAdded = true;
                     }
+                    int size = tabPane.getTabs().size();
+                    listIndex = listIndex > size ? size : listIndex;
                     tabPane.getTabs().add(listIndex, (Tab) container.getViewComponent());
                 } else {
+                    int size = splitPane.getItems().size();
+                    listIndex = listIndex > size ? size : listIndex;
                     splitPane.getItems().add(listIndex, (Node) container.getViewComponent());
                 }
             });
         }
 
-        // Keep divider position in equal distance for now
-        // TODO use weight of DockTreeItem to determine the divider position
+        // Calculate the position of dividers for split pane from weight of the
+        // children DockTreeItems. The divider positions will be calculated only
+        // if something has been added or removed of the SplitPane in the current
+        // layout
         double size = splitPane.getItems().size();
-        if (size > 1) {
-            double divPos = 1.0/size;
-            double[] positions = new double[splitPane.getItems().size() - 1];
+        if (size > 1 && isSplitPaneModified) {
 
-            for (int i=1; i<size; i++) {
-                positions[i -1] = i * divPos;
+            boolean isDockTabCounted = false;
+            double total = 0.0;
+            int zeroCount = 0;
+            List<Double> weights = new ArrayList<>(splitPane.getItems().size());
+            // Gather weight of all items. In case of SIMPLE items, the weight 
+            // will not be considered. We will just add a weiht of Zero in the 
+            // position where the Tab Pane is suppose to be. This is because, 
+            // a COMPLEX item can have a mix of both SIMPLE and COMPLEX items
+            // as its children
+            for (DockingContainer container : getChildren()) {
+                if (container instanceof DockArea) {
+                    double weight = container.getDockTreeItem().getWeight();
+                    if (weight <= 0) {
+                        zeroCount++;
+                        weight = 0.0;
+                    }
+                    weights.add(weight);
+                    total = total + weight;
+                } else {
+                    if (!isDockTabCounted) {
+                        weights.add(0.0);
+                        zeroCount++;
+                        isDockTabCounted = true;
+                    }
+                }
             }
-            splitPane.setDividerPositions(positions);
+
+            total = total > 1.0 ? 1.0 : total; 
+            // calculate remaining weight and add it to those containers
+            // with default weight of 0. So that they can be spaced evenly
+            double remaining = 1.0 - total;
+            double defaultWeight = 0.0;
+            if (zeroCount != 0) {
+                defaultWeight = remaining / zeroCount;
+            }
+            List<Double> positions = new ArrayList<>(weights.size());
+            for (int i=0; i<weights.size(); i++) {
+                if (weights.get(i) == 0.0) {
+                    positions.add(i, defaultWeight);
+                } else {
+                    positions.add(i, weights.get(i));
+                }
+            }
+            // If none of the items has a default weight of zero and total 
+            // weight does not add up to 1, then split up the remaining weight
+            // and share it equally to all items
+            if (zeroCount == 0) {
+                double extraSpace = remaining / positions.size();
+                for (int i=0; i<positions.size(); i++) {
+                    positions.set(i, positions.get(i) + extraSpace);
+                }
+            }
+            double[] posArray = new double[positions.size() - 1];
+            posArray[0] = positions.get(0);
+            for (int i=1; i<posArray.length; i++) {
+                posArray[i] = posArray[i-1] + positions.get(i);
+            }
+
+            splitPane.setDividerPositions(posArray);
             splitPane.layout();
+            isSplitPaneModified = false;
         }
     }
 

@@ -28,9 +28,11 @@ package org.controlsfx.control.docking.model;
 
 import java.util.List;
 import javafx.beans.InvalidationListener;
+import javafx.beans.property.DoubleProperty;
 import javafx.beans.property.ObjectProperty;
 import javafx.beans.property.ObjectPropertyBase;
 import javafx.beans.property.ReadOnlyObjectWrapper;
+import javafx.beans.property.SimpleDoubleProperty;
 import javafx.beans.property.SimpleObjectProperty;
 import javafx.beans.property.StringProperty;
 import javafx.beans.property.StringPropertyBase;
@@ -513,7 +515,7 @@ public class DockTreeItem implements EventTarget {
         }
         
     };
-    private final void setState(State value) { stateProperty().set(value);  }
+    private void setState(State value) { stateProperty().set(value);  }
     public final State getState() { return state.get(); }
     public final ObjectProperty<State> stateProperty() { return state; }
     
@@ -587,6 +589,16 @@ public class DockTreeItem implements EventTarget {
     public final DockMode getDockMode() { return dockMode.get(); }
     public final ObjectProperty<DockMode> dockModeProperty() { return dockMode; }
 
+    
+    private DoubleProperty weight = new SimpleDoubleProperty(0.0) {
+        @Override
+        public void invalidated() {
+            // TODO Fire event
+        }
+    };
+    public final void setWeight(Double weight) { this.weight.set(weight); }
+    public final Double getWeight() { return weight.get(); }
+    public final DoubleProperty weightProperty() { return weight; }
     
     /**************************************************************************
      * 

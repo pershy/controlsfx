@@ -28,12 +28,10 @@
 package org.controlsfx.control.docking.model;
 
 import com.sun.javafx.event.EventHandlerManager;
-import javafx.beans.InvalidationListener;
 import javafx.beans.Observable;
 import javafx.beans.property.ReadOnlyObjectProperty;
 import javafx.beans.property.ReadOnlyObjectWrapper;
 import javafx.collections.FXCollections;
-import javafx.collections.ListChangeListener;
 import javafx.collections.ObservableList;
 import javafx.event.EventDispatchChain;
 import javafx.event.EventHandler;
@@ -58,6 +56,7 @@ public class DockTree extends DockTreeItem {
     public final ReadOnlyObjectProperty<DockTreeItem> leftProperty() {
         if (left == null) {
             DockTreeItem leftItem = new DockTreeItem("LEFT");
+            leftItem.setWeight(0.2);
             leftItem.setSide(Side.LEFT);
             left = new ReadOnlyObjectWrapper<>(this, "left", leftItem);
         }
@@ -72,6 +71,7 @@ public class DockTree extends DockTreeItem {
     public final ReadOnlyObjectProperty<DockTreeItem> rightProperty() {
         if (right == null) {
             DockTreeItem rightItem = new DockTreeItem("RIGHT");
+            rightItem.setWeight(0.2);
             rightItem.setSide(Side.RIGHT);
             right = new ReadOnlyObjectWrapper<>(this, "right", rightItem);
         }
@@ -86,6 +86,7 @@ public class DockTree extends DockTreeItem {
     public final ReadOnlyObjectProperty<DockTreeItem> centerProperty() {
         if (center == null) {
             DockTreeItem centerItem = new DockTreeItem("CENTER");
+            centerItem.setWeight(0.8);
             centerItem.setSide(Side.LEFT);
             center = new ReadOnlyObjectWrapper<>(this, "center", centerItem);
         }
@@ -131,6 +132,7 @@ public class DockTree extends DockTreeItem {
             DockTreeItem bottom) {
         setText("DOCK TREE");
         centerContainer.setSide(Side.LEFT);
+        centerContainer.setWeight(0.6);
         super.getChildren().add(centerContainer);
 
         if (left != null) {
