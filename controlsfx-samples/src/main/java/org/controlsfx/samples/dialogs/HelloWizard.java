@@ -87,7 +87,7 @@ public class HelloWizard extends ControlsFXSample {
         };
         
         WizardPage page3 = new WizardPage(new Label("Page 3, with extra 'help' button!"), 
-                new DialogAction("Help", ButtonType.HELP) {
+                new DialogAction("Help", ButtonType.HELP_2) {
             @Override public void handle(ActionEvent ae) {
                 System.out.println("Help clicked!");
             }
