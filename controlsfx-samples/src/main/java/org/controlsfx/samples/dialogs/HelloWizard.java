@@ -29,6 +29,7 @@ package org.controlsfx.samples.dialogs;
 import java.util.List;
 
 import javafx.application.Application;
+import javafx.event.ActionEvent;
 import javafx.geometry.Insets;
 import javafx.scene.Node;
 import javafx.scene.control.Button;
@@ -40,6 +41,8 @@ import javafx.scene.shape.Rectangle;
 import javafx.stage.Stage;
 
 import org.controlsfx.ControlsFXSample;
+import org.controlsfx.control.ButtonBar.ButtonType;
+import org.controlsfx.dialog.DialogAction;
 import org.controlsfx.dialog.Wizard;
 import org.controlsfx.dialog.Wizard.WizardPage;
 import org.controlsfx.samples.Utils;
@@ -83,11 +86,12 @@ public class HelloWizard extends ControlsFXSample {
             }
         };
         
-        WizardPage page3 = new WizardPage() {
-            @Override public Node getContent() {
-                return new Label("Page 3");
+        WizardPage page3 = new WizardPage(new Label("Page 3, with extra 'help' button!"), 
+                new DialogAction("Help", ButtonType.HELP) {
+            @Override public void handle(ActionEvent ae) {
+                System.out.println("Help clicked!");
             }
-        };
+        });
         
         // create wizard
         Wizard wizard = new Wizard();

@@ -3,6 +3,7 @@ package org.controlsfx.dialog;
 import java.util.HashMap;
 import java.util.List;
 
+import javafx.beans.NamedArg;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
 import javafx.collections.ObservableMap;
@@ -183,22 +184,46 @@ public class Wizard {
             }
             actions.remove(ACTION_FINISH);
         }
+        
+        // remove actions from the previous page
+        WizardPage previousPage = getPages().get(previousPageIndex);
+        actions.removeAll(previousPage.getActions());
+        
+        // add in the actions for the new page
+        WizardPage currentPage = getPages().get(currentPageIndex);
+        actions.addAll(currentPage.getActions());
     }
     
     
     // TODO this should just contain a ControlsFX Form, but for now it is hand-coded
     public static class WizardPage {
+        private Node content;
+        private final ObservableList<Action> actions;
+        
+        public WizardPage() {
+            this(null);
+        }
+        
+        public WizardPage(@NamedArg("content") Node content) {
+            this(content, (Action[]) null);
+        }
+        
+        public WizardPage(@NamedArg("content") Node content, Action... actions) {
+            this.content = content;
+            this.actions = actions == null ? 
+                    FXCollections.observableArrayList() : FXCollections.observableArrayList(actions);
+        }
         
         public Node getContent() {
-            return null;
+            return content;
         }
         
         public ObservableList<Action> getActions() {
-            return null;
+            return actions;
         }
         
         public void updatePages(Wizard wizard) {
-            
+            // no-op
         }
     }
 }
