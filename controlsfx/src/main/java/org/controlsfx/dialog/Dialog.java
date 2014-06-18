@@ -349,6 +349,8 @@ public class Dialog {
                 updateDialogContent();
             }
         });
+        
+        mastheadProperty().addListener(o -> updateDialogContent());
     }
     
     void updateStyleClasses(List<String> styleClasses, boolean addUnique) {
@@ -555,6 +557,7 @@ public class Dialog {
      */
     public final void setMasthead(String mastheadText) {
         if (mastheadText == null) {
+            setMasthead((Node)null);
             return;
         }
         
