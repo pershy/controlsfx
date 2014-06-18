@@ -27,6 +27,7 @@
 package org.controlsfx.dialog;
 
 import impl.org.controlsfx.ImplUtils;
+import impl.org.controlsfx.i18n.Localization;
 
 import java.util.HashMap;
 import java.util.List;
@@ -52,7 +53,7 @@ public class Wizard {
     private final ObservableList<WizardPage> pages = FXCollections.observableArrayList();
     private final ObservableMap<String, Object> settings = FXCollections.observableHashMap();
     
-    private final Action ACTION_PREVIOUS = new DialogAction(/*Localization.asKey("wizard.previous.button")*/"Previous", ButtonType.BACK_PREVIOUS, false, false, false) { //$NON-NLS-1$
+    private final Action ACTION_PREVIOUS = new DialogAction(Localization.asKey("wizard.previous.button"), ButtonType.BACK_PREVIOUS, false, false, false) { //$NON-NLS-1$
         @Override public void handle(ActionEvent ae) {
             previousPageIndex = currentPageIndex;
             currentPageIndex--;
@@ -61,7 +62,7 @@ public class Wizard {
             validateActionState();
         }
     };
-    private final Action ACTION_NEXT = new DialogAction(/*Localization.asKey("wizard.next.button")*/"Next", ButtonType.NEXT_FORWARD, false, false, true) { //$NON-NLS-1$
+    private final Action ACTION_NEXT = new DialogAction(Localization.asKey("wizard.next.button"), ButtonType.NEXT_FORWARD, false, false, true) { //$NON-NLS-1$
         @Override public void handle(ActionEvent ae) {
             previousPageIndex = currentPageIndex;
             currentPageIndex++;
@@ -70,7 +71,7 @@ public class Wizard {
             validateActionState();
         }
     };
-    private final Action ACTION_FINISH = new DialogAction(/*Localization.asKey("wizard.finish.button")*/"Finish", ButtonType.FINISH, false, true, true) { //$NON-NLS-1$
+    private final Action ACTION_FINISH = new DialogAction(Localization.asKey("wizard.finish.button"), ButtonType.FINISH, false, true, true) { //$NON-NLS-1$
         
     };
     
