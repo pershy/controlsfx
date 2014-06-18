@@ -45,6 +45,7 @@ import javafx.stage.Stage;
 
 import org.controlsfx.ControlsFXSample;
 import org.controlsfx.control.ButtonBar.ButtonType;
+import org.controlsfx.control.action.Action;
 import org.controlsfx.dialog.DialogAction;
 import org.controlsfx.dialog.Wizard;
 import org.controlsfx.dialog.Wizard.WizardPage;
@@ -119,9 +120,11 @@ public class HelloWizard extends ControlsFXSample {
         wizard.getPages().addAll(page1, page2, page3);
 
         // show wizard
-        wizard.show();
+        Action response = wizard.show();
 
-        System.out.println("Settings: " + wizard.getSettings());
+        if (response == Wizard.ACTION_FINISH) {
+            System.out.println("Wizard finished, settings: " + wizard.getSettings());
+        }
     }
 
     private void showBranchingWizard() {
@@ -133,6 +136,8 @@ public class HelloWizard extends ControlsFXSample {
         checkBox.setId("skip-page-2");
         VBox vbox = new VBox(10, new Label("Page 1"), checkBox);
         final WizardPage page1 = new WizardPage(vbox) {
+            // when we exit page 1, we will check the state of the 'skip page 2'
+            // checkbox, and if it is true, we will remove page 2 from the pages list
             @Override public void onExitingPage(Wizard wizard) {
                 List<WizardPage> pages = wizard.getPages();
                 if (checkBox.isSelected()) {
@@ -152,9 +157,11 @@ public class HelloWizard extends ControlsFXSample {
         wizard.getPages().addAll(page1, page2, page3);
 
         // show wizard
-        wizard.show();
-
-        System.out.println("Settings: " + wizard.getSettings());
+        Action response = wizard.show();
+        
+        if (response == Wizard.ACTION_FINISH) {
+            System.out.println("Wizard finished, settings: " + wizard.getSettings());
+        }
     }
 
     private TextField createTextField(String id) {

@@ -71,8 +71,9 @@ public class Wizard {
             validateActionState();
         }
     };
-    private final Action ACTION_FINISH = new DialogAction(Localization.asKey("wizard.finish.button"), ButtonType.FINISH, false, true, true) { //$NON-NLS-1$
-        
+    public static final Action ACTION_FINISH = new DialogAction(Localization.asKey("wizard.finish.button"), ButtonType.FINISH, false, true, true) { //$NON-NLS-1$
+        { lock(); }
+        public String toString() { return "Wizard.ACTION_FINISH";} //$NON-NLS-1$
     };
     
     
