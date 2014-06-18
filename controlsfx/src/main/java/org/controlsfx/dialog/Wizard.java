@@ -1,4 +1,32 @@
+/**
+ * Copyright (c) 2014, ControlsFX
+ * All rights reserved.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions are met:
+ *     * Redistributions of source code must retain the above copyright
+ * notice, this list of conditions and the following disclaimer.
+ *     * Redistributions in binary form must reproduce the above copyright
+ * notice, this list of conditions and the following disclaimer in the
+ * documentation and/or other materials provided with the distribution.
+ *     * Neither the name of ControlsFX, any associated website, nor the
+ * names of its contributors may be used to endorse or promote products
+ * derived from this software without specific prior written permission.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
+ * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+ * WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+ * DISCLAIMED. IN NO EVENT SHALL CONTROLSFX BE LIABLE FOR ANY
+ * DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
+ * (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
+ * LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND
+ * ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+ * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
+ * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ */
 package org.controlsfx.dialog;
+
+import impl.org.controlsfx.ImplUtils;
 
 import java.util.HashMap;
 import java.util.List;
@@ -12,6 +40,7 @@ import javafx.scene.Node;
 
 import org.controlsfx.control.ButtonBar.ButtonType;
 import org.controlsfx.control.action.Action;
+import org.controlsfx.tools.ValueExtractor;
 
 public class Wizard {
     
@@ -21,6 +50,7 @@ public class Wizard {
     private int currentPageIndex = 0;
     
     private final ObservableList<WizardPage> pages = FXCollections.observableArrayList();
+    private final ObservableMap<String, Object> settings = FXCollections.observableHashMap();
     
     private final Action ACTION_PREVIOUS = new DialogAction(/*Localization.asKey("wizard.previous.button")*/"Previous", ButtonType.BACK_PREVIOUS, false, false, false) { //$NON-NLS-1$
         @Override public void handle(ActionEvent ae) {
@@ -40,17 +70,20 @@ public class Wizard {
             validateActionState();
         }
     };
-    private final Action ACTION_FINISH = new DialogAction(/*Localization.asKey("wizard.finish.button")*/"Finish", ButtonType.FINISH, false, false, true) { //$NON-NLS-1$
-        @Override public void handle(ActionEvent ae) {
-            // TODO
-            System.out.println("Finish");
-        }
+    private final Action ACTION_FINISH = new DialogAction(/*Localization.asKey("wizard.finish.button")*/"Finish", ButtonType.FINISH, false, true, true) { //$NON-NLS-1$
+        
     };
     
     
     // --- pages
     public final ObservableList<WizardPage> getPages() {
         return pages;
+    }
+    
+    
+    // --- settings
+    public final ObservableMap<String, Object> getSettings() {
+        return settings;
     }
     
     
@@ -110,7 +143,7 @@ public class Wizard {
     
     
     
-    public void show() {
+    public Action show() {
         dialog = new Dialog(null, "WIZARD POWER!");
         dialog.setMasthead("Masthead text");
         dialog.getActions().setAll(ACTION_PREVIOUS, ACTION_NEXT, ACTION_FINISH, Dialog.ACTION_CANCEL);
@@ -119,16 +152,27 @@ public class Wizard {
         validateActionState();
         
         // --- show the wizard!
-        dialog.show();
+        return dialog.show();
     }
     
     private void updatePage(Dialog dialog) {
         WizardPage previousPage;
         WizardPage newPage;
         
+        final boolean goingForward = currentPageIndex > previousPageIndex;
+        
         if (previousPageIndex >= 0 && previousPageIndex < getPages().size()) {
             previousPage = getPages().get(previousPageIndex);
             
+            // if we are going forward in the wizard, we read in the settings 
+            // from the page and store them in the settings map.
+            // If we are going backwards, we do nothing
+            if (goingForward) {
+                readSettings(previousPage);
+            }
+            
+            // give the previous wizard page a chance to update the pages list
+            // based on the settings it has received
             if (previousPage != null) {
                 previousPage.updatePages(this);
             }
@@ -194,6 +238,67 @@ public class Wizard {
         actions.addAll(currentPage.getActions());
     }
     
+    private int settingCounter;
+    private void readSettings(WizardPage page) {
+        // for now we cannot know the structure of the page, so we just drill down
+        // through the entire scenegraph (from page.content down) until we get
+        // to the leaf nodes. We stop only if we find a node that is a
+        // ValueContainer (either by implementing the interface), or being 
+        // listed in the internal valueContainers map.
+        
+        settingCounter = 0;
+        checkNode(page.getContent());
+    }
+    
+    private boolean checkNode(Node n) {
+        boolean success = readSetting(n);
+        
+        if (success) {
+            // we've added the setting to the settings map and we should stop drilling deeper
+            return true;
+        } else {
+            // go into children of this node (if possible) and see if we can get
+            // a value from them (recursively)
+            List<Node> children = ImplUtils.getChildren(n, false);
+            
+            // we're doing a depth-first search, where we stop drilling down
+            // once we hit a successful read
+            for (Node child : children) {
+                boolean childSuccess = checkNode(child);
+                if (childSuccess) {
+                    return true;
+                }
+            }
+        }
+        
+        return false;
+    }
+    
+    private boolean readSetting(Node n) {
+        if (n == null) {
+            return false;
+        }
+
+        Object setting = ValueExtractor.getValue(n);
+        
+        if (setting != null) {
+            // save it into the settings map.
+            // if the node has an id set, we will use that as the setting name
+            String settingName = n.getId();
+            
+            // but if the id is not set, we will use a generic naming scheme
+            if (settingName == null || settingName.isEmpty()) {
+                settingName = "page_" + previousPageIndex + ".setting_" + settingCounter; 
+            }
+            
+            getSettings().put(settingName, setting);
+            
+            settingCounter++;
+        }
+        
+        return setting != null;
+    }
+    
     
     // TODO this should just contain a ControlsFX Form, but for now it is hand-coded
     public static class WizardPage {
@@ -214,7 +319,7 @@ public class Wizard {
                     FXCollections.observableArrayList() : FXCollections.observableArrayList(actions);
         }
         
-        public Node getContent() {
+        public final Node getContent() {
             return content;
         }
         

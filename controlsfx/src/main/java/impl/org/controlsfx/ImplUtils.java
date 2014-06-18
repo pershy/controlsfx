@@ -27,7 +27,10 @@
 package impl.org.controlsfx;
 
 import java.lang.reflect.Method;
+import java.util.Collections;
+import java.util.List;
 
+import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
 import javafx.scene.Group;
 import javafx.scene.Node;
@@ -65,7 +68,7 @@ public class ImplUtils {
             throw new IllegalArgumentException("parent can not be null");
         }
         
-        ObservableList<Node> ownerParentChildren = getChildren(parent.getParent(), useReflection);
+        List<Node> ownerParentChildren = getChildren(parent.getParent(), useReflection);
         
         // we've got the children list, now we need to insert a temporary
         // layout container holding our dialogs and opaque layer / effect
@@ -90,8 +93,12 @@ public class ImplUtils {
         scene.setRoot(originalParent);        
     }
     
+    public static List<Node> getChildren(Node n, boolean useReflection) {
+        return n instanceof Parent ? getChildren((Parent)n, useReflection) : Collections.emptyList();
+    }
+    
     @SuppressWarnings("unchecked")
-    public static ObservableList<Node> getChildren(Parent p, boolean useReflection) {
+    public static List<Node> getChildren(Parent p, boolean useReflection) {
         ObservableList<Node> children = null;
         
         // previously we used reflection immediately, now we try to avoid reflection
@@ -124,11 +131,11 @@ public class ImplUtils {
             }
         }
         
-        if (children == null) {
+        if (useReflection && children == null) {
             throw new RuntimeException("Unable to get children for Parent of type " + p.getClass() + 
-                                       ". useReflection is set to " + useReflection);
+                                       ". useReflection is set to true");
         }
         
-        return children;
+        return children != null ? children : Collections.emptyList();
     }
 }

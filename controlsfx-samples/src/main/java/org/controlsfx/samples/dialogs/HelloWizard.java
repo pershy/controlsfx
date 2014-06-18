@@ -74,17 +74,9 @@ public class HelloWizard extends ControlsFXSample {
 	
 	private void showWizard() {
         // define pages to show
-        WizardPage page1 = new WizardPage() {
-            @Override public Node getContent() {
-                return new Label("Page 1");
-            }
-        };
+        WizardPage page1 = new WizardPage(new Label("Page 1"));
         
-        WizardPage page2 = new WizardPage() {
-            @Override public Node getContent() {
-                return new Label("Page 2");
-            }
-        };
+        WizardPage page2 = new WizardPage(new Label("Page 2"));
         
         WizardPage page3 = new WizardPage(new Label("Page 3, with extra 'help' button!"), 
                 new DialogAction("Help", ButtonType.HELP_2) {
@@ -99,25 +91,19 @@ public class HelloWizard extends ControlsFXSample {
         
         // show wizard
         wizard.show();
+        
+        System.out.println("Settings: " + wizard.getSettings());
     }
     
     private void showBranchingWizard() {
         // define pages to show.
         // Because page1 references page2, we need to declare page2 first.
-        final WizardPage page2 = new WizardPage() {
-            public Node getContent() {
-                return new Label("Page 2");
-            }
-        };
+        final WizardPage page2 = new WizardPage(new Label("Page 2"));
         
-        final WizardPage page1 = new WizardPage() {
-            final CheckBox checkBox = new CheckBox("Skip the second page");
-            
-            public Node getContent() {
-                VBox vbox = new VBox(10, new Label("Page 1"), checkBox);
-                return vbox;
-            }
-            
+        final CheckBox checkBox = new CheckBox("Skip the second page");
+        checkBox.setId("skip-page-2");
+        VBox vbox = new VBox(10, new Label("Page 1"), checkBox);
+        final WizardPage page1 = new WizardPage(vbox) {
             @Override public void updatePages(Wizard wizard) {
                 List<WizardPage> pages = wizard.getPages();
                 if (checkBox.isSelected()) {
@@ -130,11 +116,7 @@ public class HelloWizard extends ControlsFXSample {
             }
         };
         
-        final WizardPage page3 = new WizardPage() {
-            public Node getContent() {
-                return new Label("Page 3");
-            }
-        };
+        final WizardPage page3 = new WizardPage(new Label("Page 3"));
         
         // create wizard
         Wizard wizard = new Wizard();
@@ -142,6 +124,8 @@ public class HelloWizard extends ControlsFXSample {
         
         // show wizard
         wizard.show();
+        
+        System.out.println("Settings: " + wizard.getSettings());
     }
 
 	public static void main(String[] args) {
