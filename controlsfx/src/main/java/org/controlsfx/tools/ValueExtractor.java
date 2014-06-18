@@ -89,11 +89,9 @@ public class ValueExtractor {
     }
     
     /**
-     * Attempts to return a value for the given Node. This is done by firstly
-     * checking if the node is an instance of {@link ValueContainer}, and if so,
-     * using that to extract the value. If the node is not a ValueContainer,
-     * we check the map of value extractors, contained within this class. This
-     * map contains value extractors for common UI controls, but more extracts
+     * Attempts to return a value for the given Node. This is done by checking
+     * the map of value extractors, contained within this class. This
+     * map contains value extractors for common UI controls, but more extractors
      * can be added by calling {@link #addValueExtractor(Class, Callback)}.
      * 
      * @param n The node from whom a value will hopefully be extracted.
@@ -102,10 +100,6 @@ public class ValueExtractor {
     @SuppressWarnings({"rawtypes", "unchecked"})
     public static Object getValue(Node n) {
         Object value = null;
-        
-        if (n instanceof ValueContainer) {
-            value = ((ValueContainer<?>)n).getValue();
-        }
         
         if (value == null && valueExtractors.containsKey(n.getClass())) {
             Callback callback = valueExtractors.get(n.getClass());
