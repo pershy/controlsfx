@@ -220,12 +220,18 @@ public class Wizard {
         
         ACTION_PREVIOUS.setDisabled(currentPageIndex == 0);
         
+        // Note that we put the 'next' and 'finish' actions at the beginning of 
+        // the actions list, so that it takes precedence as the default button, 
+        // over, say, cancel. We will probably want to handle this better in the
+        // future...
+        
         if (atEndOfWizard) {
             actions.remove(ACTION_NEXT);
-            actions.add(ACTION_FINISH);
+            
+            actions.add(0, ACTION_FINISH);
         } else {
             if (! actions.contains(ACTION_NEXT)) {
-                actions.add(ACTION_NEXT);
+                actions.add(0, ACTION_NEXT);
             }
             actions.remove(ACTION_FINISH);
         }
