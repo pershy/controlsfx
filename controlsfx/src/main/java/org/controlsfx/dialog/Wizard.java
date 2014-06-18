@@ -38,6 +38,7 @@ import javafx.collections.ObservableList;
 import javafx.collections.ObservableMap;
 import javafx.event.ActionEvent;
 import javafx.scene.Node;
+import javafx.scene.image.ImageView;
 
 import org.controlsfx.control.ButtonBar.ButtonType;
 import org.controlsfx.control.action.Action;
@@ -45,7 +46,30 @@ import org.controlsfx.tools.ValueExtractor;
 
 public class Wizard {
     
+    
+    /**************************************************************************
+     * 
+     * Static fields
+     * 
+     **************************************************************************/
+    
+    public static final Action ACTION_FINISH = new DialogAction(Localization.asKey("wizard.finish.button"), ButtonType.FINISH, false, true, true) { //$NON-NLS-1$
+        { lock(); }
+        public String toString() { return "Wizard.ACTION_FINISH";} //$NON-NLS-1$
+    };
+    
+    
+    
+    /**************************************************************************
+     * 
+     * Private fields
+     * 
+     **************************************************************************/
+    
     private Dialog dialog;
+    
+    private Object owner;
+    private String title;    
     
     private int previousPageIndex = 0;
     private int currentPageIndex = 0;
@@ -53,6 +77,7 @@ public class Wizard {
     private final ObservableList<WizardPage> pages = FXCollections.observableArrayList();
     private final ObservableMap<String, Object> settings = FXCollections.observableHashMap();
     
+    // TODO these should be public static actions
     private final Action ACTION_PREVIOUS = new DialogAction(Localization.asKey("wizard.previous.button"), ButtonType.BACK_PREVIOUS, false, false, false) { //$NON-NLS-1$
         @Override public void handle(ActionEvent ae) {
             previousPageIndex = currentPageIndex;
@@ -71,10 +96,47 @@ public class Wizard {
             validateActionState();
         }
     };
-    public static final Action ACTION_FINISH = new DialogAction(Localization.asKey("wizard.finish.button"), ButtonType.FINISH, false, true, true) { //$NON-NLS-1$
-        { lock(); }
-        public String toString() { return "Wizard.ACTION_FINISH";} //$NON-NLS-1$
-    };
+    
+    
+    
+    
+    /**************************************************************************
+     * 
+     * Constructors
+     * 
+     **************************************************************************/
+    
+    /**
+     * 
+     */
+    public Wizard() {
+        this(null);
+    }
+    
+    /**
+     * 
+     * @param owner
+     */
+    public Wizard(Object owner) {
+        this(owner, "");
+    }
+    
+    /**
+     * 
+     * @param owner
+     * @param title
+     */
+    public Wizard(Object owner, String title) {
+        this.owner = owner;
+        this.title = title;
+    }
+    
+    
+    /**************************************************************************
+     * 
+     * Public API
+     * 
+     **************************************************************************/
     
     
     // --- pages
@@ -87,6 +149,25 @@ public class Wizard {
     public final ObservableMap<String, Object> getSettings() {
         return settings;
     }
+    
+    public Action show() {
+        dialog = new Dialog(owner, title);
+        dialog.getActions().setAll(ACTION_PREVIOUS, ACTION_NEXT, ACTION_FINISH, Dialog.ACTION_CANCEL);
+        
+        updatePage(dialog);
+        validateActionState();
+        
+        // --- show the wizard!
+        return dialog.show();
+    }
+    
+    
+    
+    /**************************************************************************
+     * 
+     * Properties
+     * 
+     **************************************************************************/
     
     
     // --- Properties
@@ -145,17 +226,11 @@ public class Wizard {
     
     
     
-    public Action show() {
-        dialog = new Dialog(null, "WIZARD POWER!");
-        dialog.setMasthead("Masthead text");
-        dialog.getActions().setAll(ACTION_PREVIOUS, ACTION_NEXT, ACTION_FINISH, Dialog.ACTION_CANCEL);
-        
-        updatePage(dialog);
-        validateActionState();
-        
-        // --- show the wizard!
-        return dialog.show();
-    }
+    /**************************************************************************
+     * 
+     * Private implementation
+     * 
+     **************************************************************************/
     
     private void updatePage(Dialog dialog) {
         WizardPage previousPage;
@@ -205,6 +280,10 @@ public class Wizard {
             dialog.setContent((Node)null);
         } else {
             newPage.onEnteringPage(this);
+            
+            dialog.setMasthead(newPage.getMasthead());
+            dialog.setGraphic(newPage.getGraphic());
+            
             Node content = newPage.getContent();
             dialog.setContent(content);
         }
@@ -311,23 +390,43 @@ public class Wizard {
     }
     
     
+    
+    /**************************************************************************
+     * 
+     * Support classes
+     * 
+     **************************************************************************/
+    
+    /**
+     * 
+     */
     // TODO this should just contain a ControlsFX Form, but for now it is hand-coded
     public static class WizardPage {
+        private final ObservableList<Action> actions = FXCollections.observableArrayList();
+
         private Node content;
-        private final ObservableList<Action> actions;
+        private String masthead;
+        private Node graphic;
         
         public WizardPage() {
             this(null);
         }
         
         public WizardPage(@NamedArg("content") Node content) {
-            this(content, (Action[]) null);
+            this(content, null);
         }
         
-        public WizardPage(@NamedArg("content") Node content, Action... actions) {
-            this.content = content;
-            this.actions = actions == null ? 
-                    FXCollections.observableArrayList() : FXCollections.observableArrayList(actions);
+        public WizardPage(@NamedArg("content") Node content, 
+                         @NamedArg("masthead") String masthead) {
+            this(content, masthead, null);
+        }
+        
+        public WizardPage(@NamedArg("content") Node content, 
+                          @NamedArg("masthead") String masthead,
+                          @NamedArg("graphic") Node graphic) {
+           this.content = content;
+           this.masthead = masthead;
+           this.graphic = graphic != null ? graphic : new ImageView(DialogResources.getImage("confirm.image"));
         }
         
         public final Node getContent() {
@@ -346,6 +445,22 @@ public class Wizard {
         // TODO same here - replace with events
         public void onExitingPage(Wizard wizard) {
             
+        }
+        
+        public void setGraphic(Node graphic) {
+            this.graphic = graphic;
+        }
+        
+        public final Node getGraphic() {
+            return graphic;
+        }
+        
+        public void setMasthead(String masthead) {
+            this.masthead = masthead;
+        }
+        
+        public final String getMasthead() {
+            return masthead;
         }
     }
 }

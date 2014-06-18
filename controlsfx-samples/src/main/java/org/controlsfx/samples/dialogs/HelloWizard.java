@@ -92,12 +92,12 @@ public class HelloWizard extends ControlsFXSample {
         page1Grid.add(new Label("Last Name:"), 0, row);
         page1Grid.add(createTextField("lastName"), 1, row);
 
-        WizardPage page1 = new WizardPage(page1Grid);
+        WizardPage page1 = new WizardPage(page1Grid, "Please Enter Your Details");
 
 
         // --- page 2
         final Label page2Label = new Label();
-        WizardPage page2 = new WizardPage(page2Label) {
+        WizardPage page2 = new WizardPage(page2Label, "Thanks For Your Details!") {
             @Override public void onEnteringPage(Wizard wizard) {
                 String firstName = (String) wizard.getSettings().get("firstName");
                 String lastName = (String) wizard.getSettings().get("lastName");
@@ -108,8 +108,8 @@ public class HelloWizard extends ControlsFXSample {
 
 
         // --- page 3
-        WizardPage page3 = new WizardPage(new Label("Page 3, with extra 'help' button!"), 
-                new DialogAction("Help", ButtonType.HELP_2) {
+        WizardPage page3 = new WizardPage(new Label("Page 3, with extra 'help' button!"), "Goodbye!");
+        page3.getActions().add(new DialogAction("Help", ButtonType.HELP_2) {
             @Override public void handle(ActionEvent ae) {
                 System.out.println("Help clicked!");
             }
