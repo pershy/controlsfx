@@ -294,6 +294,7 @@ public class Wizard {
             dialog.setGraphic(newPage.getGraphic());
             
             Node content = newPage.getContent();
+            validationSupport.clearValidationResults();
             dialog.setContent(content);
         }
     }

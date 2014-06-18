@@ -162,14 +162,21 @@ public class ValidationSupport {
 
         // notify validation result observers
         validationResults.addListener( (MapChangeListener.Change<? extends Control, ? extends ValidationResult> change) ->
-        validationResultProperty.set(ValidationResult.fromResults(validationResults.values()))
-                );
+        	validationResultProperty.set(ValidationResult.fromResults(validationResults.values()))
+        );
 
         // validation decoration
         validationResultProperty().addListener( (o, oldValue, validationResult) -> {
             invalidProperty.set(!validationResult.getErrors().isEmpty());
             redecorate();
         });
+    }
+    
+    /**
+     * Clears all validation results
+     */
+    public void clearValidationResults() {
+    	validationResults.clear();
     }
 
     /**
