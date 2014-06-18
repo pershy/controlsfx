@@ -149,7 +149,8 @@ public class Action implements EventHandler<ActionEvent> {
     // --- disabled
     private final BooleanProperty disabledProperty = new SimpleBooleanProperty(this, "disabled"){ //$NON-NLS-1$
     	public void set(boolean value) {
-    		if ( locked ) throw new RuntimeException("The action is immutable, property change suppport is disabled.");
+    		// we don't want to lock here - this is essential for every action
+    		//if ( locked ) throw new RuntimeException("The action is immutable, property change suppport is disabled.");
     		super.set(value);
     	}
     };

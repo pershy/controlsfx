@@ -43,6 +43,7 @@ import javafx.scene.image.ImageView;
 import org.controlsfx.control.ButtonBar.ButtonType;
 import org.controlsfx.control.action.Action;
 import org.controlsfx.tools.ValueExtractor;
+import org.controlsfx.validation.ValidationSupport;
 
 public class Wizard {
     
@@ -54,7 +55,7 @@ public class Wizard {
      **************************************************************************/
     
     public static final Action ACTION_FINISH = new DialogAction(Localization.asKey("wizard.finish.button"), ButtonType.FINISH, false, true, true) { //$NON-NLS-1$
-        { lock(); }
+        { lock(); } 
         public String toString() { return "Wizard.ACTION_FINISH";} //$NON-NLS-1$
     };
     
@@ -76,6 +77,8 @@ public class Wizard {
     
     private final ObservableList<WizardPage> pages = FXCollections.observableArrayList();
     private final ObservableMap<String, Object> settings = FXCollections.observableHashMap();
+    
+    private final ValidationSupport validationSupport = new ValidationSupport();
     
     // TODO these should be public static actions
     private final Action ACTION_PREVIOUS = new DialogAction(Localization.asKey("wizard.previous.button"), ButtonType.BACK_PREVIOUS, false, false, false) { //$NON-NLS-1$
@@ -129,6 +132,8 @@ public class Wizard {
     public Wizard(Object owner, String title) {
         this.owner = owner;
         this.title = title;
+        
+        validationSupport.validationResultProperty().addListener( (o, ov, nv) -> validateActionState());
     }
     
     
@@ -225,6 +230,10 @@ public class Wizard {
     }
     
     
+    public ValidationSupport getValidationSupport() {
+		return validationSupport;
+	}
+    
     
     /**************************************************************************
      * 
@@ -315,11 +324,13 @@ public class Wizard {
             actions.remove(ACTION_NEXT);
             
             actions.add(0, ACTION_FINISH);
+            ACTION_FINISH.setDisabled( validationSupport.isInvalid());
         } else {
             if (! actions.contains(ACTION_NEXT)) {
                 actions.add(0, ACTION_NEXT);
             }
             actions.remove(ACTION_FINISH);
+            ACTION_NEXT.setDisabled( validationSupport.isInvalid());
         }
         
         // remove actions from the previous page

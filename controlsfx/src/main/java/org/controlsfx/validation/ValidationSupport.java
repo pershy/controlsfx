@@ -208,7 +208,7 @@ public class ValidationSupport {
         return validationResultProperty.getReadOnlyProperty();
     }
 
-    private ReadOnlyObjectWrapper<Boolean> invalidProperty = new ReadOnlyObjectWrapper<Boolean>(); 
+    private ReadOnlyObjectWrapper<Boolean> invalidProperty = new ReadOnlyObjectWrapper<Boolean>(false); 
 
 
     /**

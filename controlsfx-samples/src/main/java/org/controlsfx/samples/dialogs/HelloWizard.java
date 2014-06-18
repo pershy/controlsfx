@@ -39,8 +39,6 @@ import javafx.scene.control.TextField;
 import javafx.scene.layout.GridPane;
 import javafx.scene.layout.Priority;
 import javafx.scene.layout.VBox;
-import javafx.scene.paint.Color;
-import javafx.scene.shape.Rectangle;
 import javafx.stage.Stage;
 
 import org.controlsfx.ControlsFXSample;
@@ -50,6 +48,7 @@ import org.controlsfx.dialog.DialogAction;
 import org.controlsfx.dialog.Wizard;
 import org.controlsfx.dialog.Wizard.WizardPage;
 import org.controlsfx.samples.Utils;
+import org.controlsfx.validation.Validator;
 
 public class HelloWizard extends ControlsFXSample {
 
@@ -79,6 +78,8 @@ public class HelloWizard extends ControlsFXSample {
     private void showWizard() {
         // define pages to show
 
+    	Wizard wizard = new Wizard();
+    	
         // --- page 1
         int row = 0;
 
@@ -87,10 +88,14 @@ public class HelloWizard extends ControlsFXSample {
         page1Grid.setHgap(10);
 
         page1Grid.add(new Label("First Name:"), 0, row);
-        page1Grid.add(createTextField("firstName"), 1, row++);
+        TextField txFirstName = createTextField("firstName");
+        wizard.getValidationSupport().registerValidator(txFirstName, Validator.createEmptyValidator("First Name is mandatory"));	
+        page1Grid.add(txFirstName, 1, row++);
 
         page1Grid.add(new Label("Last Name:"), 0, row);
-        page1Grid.add(createTextField("lastName"), 1, row);
+        TextField txLastName = createTextField("lastName");
+        wizard.getValidationSupport().registerValidator(txLastName, Validator.createEmptyValidator("Last Name is mandatory"));
+		page1Grid.add(txLastName, 1, row);
 
         WizardPage page1 = new WizardPage(page1Grid, "Please Enter Your Details");
 
@@ -116,7 +121,7 @@ public class HelloWizard extends ControlsFXSample {
         });
 
         // create wizard
-        Wizard wizard = new Wizard();
+        
         wizard.getPages().addAll(page1, page2, page3);
 
         // show wizard
