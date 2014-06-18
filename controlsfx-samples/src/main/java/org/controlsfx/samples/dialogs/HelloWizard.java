@@ -35,6 +35,9 @@ import javafx.scene.Node;
 import javafx.scene.control.Button;
 import javafx.scene.control.CheckBox;
 import javafx.scene.control.Label;
+import javafx.scene.control.TextField;
+import javafx.scene.layout.GridPane;
+import javafx.scene.layout.Priority;
 import javafx.scene.layout.VBox;
 import javafx.scene.paint.Color;
 import javafx.scene.shape.Rectangle;
@@ -49,62 +52,88 @@ import org.controlsfx.samples.Utils;
 
 public class HelloWizard extends ControlsFXSample {
 
-	@Override
-	public String getSampleName() {
-		return "Wizards";
-	}
+    @Override
+    public String getSampleName() {
+        return "Wizards";
+    }
 
-	@Override
-	public String getJavaDocURL() {
-		return Utils.JAVADOC_BASE + "org/controlsfx/dialog/Wizard.html";
-	}
+    @Override
+    public String getJavaDocURL() {
+        return Utils.JAVADOC_BASE + "org/controlsfx/dialog/Wizard.html";
+    }
 
-	@Override
-	public Node getPanel(final Stage stage) {
-		Button button1 = new Button("Simple Wizard!");
+    @Override
+    public Node getPanel(final Stage stage) {
+        Button button1 = new Button("Simple Wizard!");
         button1.setOnAction(e -> showWizard());
-        
+
         Button button2 = new Button("Branching Wizard!");
         button2.setOnAction(e -> showBranchingWizard());
-        
+
         VBox vbox = new VBox(10, button1, button2);
         vbox.setPadding(new Insets(10));
         return vbox;
-	}
-	
-	private void showWizard() {
+    }
+
+    private void showWizard() {
         // define pages to show
-        WizardPage page1 = new WizardPage(new Label("Page 1"));
-        
-        WizardPage page2 = new WizardPage(new Label("Page 2"));
-        
+
+        // --- page 1
+        int row = 0;
+
+        GridPane page1Grid = new GridPane();
+        page1Grid.setVgap(10);
+        page1Grid.setHgap(10);
+
+        page1Grid.add(new Label("First Name:"), 0, row);
+        page1Grid.add(createTextField("firstName"), 1, row++);
+
+        page1Grid.add(new Label("Last Name:"), 0, row);
+        page1Grid.add(createTextField("lastName"), 1, row);
+
+        WizardPage page1 = new WizardPage(page1Grid);
+
+
+        // --- page 2
+        final Label page2Label = new Label();
+        WizardPage page2 = new WizardPage(page2Label) {
+            @Override public void onEnteringPage(Wizard wizard) {
+                String firstName = (String) wizard.getSettings().get("firstName");
+                String lastName = (String) wizard.getSettings().get("lastName");
+
+                page2Label.setText("Welcome, " + firstName + " " + lastName + "!");
+            }
+        };
+
+
+        // --- page 3
         WizardPage page3 = new WizardPage(new Label("Page 3, with extra 'help' button!"), 
                 new DialogAction("Help", ButtonType.HELP_2) {
             @Override public void handle(ActionEvent ae) {
                 System.out.println("Help clicked!");
             }
         });
-        
+
         // create wizard
         Wizard wizard = new Wizard();
         wizard.getPages().addAll(page1, page2, page3);
-        
+
         // show wizard
         wizard.show();
-        
+
         System.out.println("Settings: " + wizard.getSettings());
     }
-    
+
     private void showBranchingWizard() {
         // define pages to show.
         // Because page1 references page2, we need to declare page2 first.
         final WizardPage page2 = new WizardPage(new Label("Page 2"));
-        
+
         final CheckBox checkBox = new CheckBox("Skip the second page");
         checkBox.setId("skip-page-2");
         VBox vbox = new VBox(10, new Label("Page 1"), checkBox);
         final WizardPage page1 = new WizardPage(vbox) {
-            @Override public void updatePages(Wizard wizard) {
+            @Override public void onExitingPage(Wizard wizard) {
                 List<WizardPage> pages = wizard.getPages();
                 if (checkBox.isSelected()) {
                     pages.remove(page2);
@@ -115,20 +144,27 @@ public class HelloWizard extends ControlsFXSample {
                 }
             }
         };
-        
+
         final WizardPage page3 = new WizardPage(new Label("Page 3"));
-        
+
         // create wizard
         Wizard wizard = new Wizard();
         wizard.getPages().addAll(page1, page2, page3);
-        
+
         // show wizard
         wizard.show();
-        
+
         System.out.println("Settings: " + wizard.getSettings());
     }
 
-	public static void main(String[] args) {
-		Application.launch(args);
-	}
+    private TextField createTextField(String id) {
+        TextField textField = new TextField();
+        textField.setId(id);
+        GridPane.setHgrow(textField, Priority.ALWAYS);
+        return textField;
+    }
+
+    public static void main(String[] args) {
+        Application.launch(args);
+    }
 }

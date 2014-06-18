@@ -175,7 +175,7 @@ public class Wizard {
             // give the previous wizard page a chance to update the pages list
             // based on the settings it has received
             if (previousPage != null) {
-                previousPage.updatePages(this);
+                previousPage.onExitingPage(this);
             }
         }
         
@@ -200,7 +200,13 @@ public class Wizard {
             newPage = getPages().get(newPageIndex);
         }
         
-        dialog.setContent(newPage == null ? null : newPage.getContent());
+        if (newPage == null) {
+            dialog.setContent((Node)null);
+        } else {
+            newPage.onEnteringPage(this);
+            Node content = newPage.getContent();
+            dialog.setContent(content);
+        }
     }
     
     private void validateCurrentPageIndex() {
@@ -270,22 +276,19 @@ public class Wizard {
             
             // we're doing a depth-first search, where we stop drilling down
             // once we hit a successful read
+            boolean childSuccess = false;
             for (Node child : children) {
-                boolean childSuccess = checkNode(child);
-                if (childSuccess) {
-                    return true;
-                }
+                childSuccess |= checkNode(child);
             }
+            return childSuccess;
         }
-        
-        return false;
     }
     
     private boolean readSetting(Node n) {
         if (n == null) {
             return false;
         }
-
+        
         Object setting = ValueExtractor.getValue(n);
         
         if (setting != null) {
@@ -330,12 +333,18 @@ public class Wizard {
             return content;
         }
         
-        public ObservableList<Action> getActions() {
+        public final ObservableList<Action> getActions() {
             return actions;
         }
+
+        // TODO we want to change this to an event-based API eventually
+        public void onEnteringPage(Wizard wizard) {
+            
+        }
         
-        public void updatePages(Wizard wizard) {
-            // no-op
+        // TODO same here - replace with events
+        public void onExitingPage(Wizard wizard) {
+            
         }
     }
 }
