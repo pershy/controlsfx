@@ -19,5 +19,12 @@ public enum ExcelCellType {
     /**
      * Constant to represent {@link Boolean}
      */
-    BOOLEAN
+    BOOLEAN,
+    /**
+     * Constant to represent {@link java.util.Date}.
+     * <p>{@link DateTimeColumnExporter} should be used to define the column exporter for
+     * this excel cell type. If not used, {@link DateTimeColumnExporter#DEFAULT_FORMAT} should
+     * be used to format date for the cell data.</p>
+     */
+    DATE
 }
