@@ -39,7 +39,7 @@ public class ColumnExporter<T, R> {
      * @return Mapper function to convert generic type of TableView to the type of data stored
      *         in the cells of a TableColumn.
      */
-    public Function getConverter() {
+    public Function<T, ?> getConverter() {
         return converter;
     }
 
