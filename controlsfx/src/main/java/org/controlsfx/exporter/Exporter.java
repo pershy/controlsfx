@@ -1,9 +1,18 @@
 package org.controlsfx.exporter;
 
+import com.sun.javafx.scene.control.skin.NestedTableColumnHeader;
+import com.sun.javafx.scene.control.skin.TableColumnHeader;
+import com.sun.javafx.scene.control.skin.TableHeaderRow;
+import com.sun.javafx.scene.control.skin.TableViewSkin;
+import com.sun.javafx.scene.control.skin.VirtualFlow;
+import javafx.application.Platform;
 import javafx.beans.property.ReadOnlyDoubleProperty;
 import javafx.beans.property.ReadOnlyDoubleWrapper;
 import javafx.collections.ObservableList;
+import javafx.scene.Node;
+import javafx.scene.control.TableCell;
 import javafx.scene.control.TableColumn;
+import javafx.scene.control.TableRow;
 import javafx.scene.control.TableView;
 
 import java.io.IOException;
@@ -11,21 +20,28 @@ import java.io.OutputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
+import java.util.Map;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.Function;
 import java.util.stream.Collectors;
+import java.util.stream.IntStream;
 
 /**
  * Creates an Excel file from a {@link TableView TableView}. The excel
- * file is created at the given {@link Path path}. The implementation should
+ * file is created at the given {@link Path path}. The implementation may
  * use a {@link ColumnExporter} while creating a cell in the Excel file,
- * so as to retain the data and type.
- * 
+ * so as to retain the data and type. This may also be used to render custom
+ * cells like images, buttons etc. into their textual representation. 
+ *
  * <h3>Code Example:</h3>
  * <p>Creating an Exporter needs a TableView. The generic type of TableView and the 
  * Exporter must the same. For this example, we declare a Person model which consists of
  * a firstName and lastName properties. Here is how the model looks like:</p>
- * 
- * <pre>
- * {@code
+ *
+ * <pre>{@code
  * public class Person {
  *     private StringProperty firstName;
  *     public void setFirstName(String value) { firstNameProperty().set(value); }
@@ -42,48 +58,70 @@ import java.util.stream.Collectors;
  *         if (lastName == null) lastName = new SimpleStringProperty(this, "lastName");
  *         return lastName;
  *     }
+ *
+ *     private final ObjectProperty<Date> dob;
+ *     public void setDob(Date dob) { this.dob.set(dob); }
+ *     public Date getDob() { return dob.get(); }
+ *     public ObjectProperty<Date> dobProperty() {
+ *         if (dob == null) dob = new SimpleObjectProperty(this, "dob");
+ *         return dob;
+ *     }
  * }}</pre>
  *
- * <p>Next, a TableView instance needs to be defined, as such:</p>
+ * <p>Next, a TableView instance needs to be defined along with the TableColumns, as such:</p>
  *
- * <pre>
- * {@code
- * TableView<Person> table = new TableView<Person>();
- * }
- * </pre>
- * 
- * <p>Next, we need to declare TableColumns and their corresponding ColumnExporter, as shown below:</p>
- * 
- * <pre>
- * {@code
+ * <pre>{@code
+ * TableView<Person> table = new TableView<>();
+ *
  * TableColumn<Person, String> firstNameCol = new TableColumn<>("First Name");
- * ExporterUtils.setColumnExporter(firstNameCol, new ColumnExporter<>(Person::getFirstName, ExcelCellType.STRING));
- *
+ * firstNameCol.setCellValueFactory(new PropertyValueFactory<>("firstName"));
  * TableColumn<Person, String> lastNameCol = new TableColumn<>("Last Name");
- * ExporterUtils.setColumnExporter(lastNameCol, new ColumnExporter<>(Person::getLastName, ExcelCellType.STRING));
- * }
- * </pre>
- * 
+ * lastNameCol.setCellValueFactory(new PropertyValueFactory<>("lastName"));
+ * TableColumn<Person, Date> dobCol = new TableColumn<>("Date of Birth");
+ * dobCol.setCellValueFactory(new PropertyValueFactory<>("dob"));
+ *
+ * tableView.getColumns().addAll(firstNameCol, lastNameCol, emailCol, ageCol, dobCol);
+ * }</pre>
+ *
  * <p>Once, the columns have been added to the TableView and shown on the scene-graph, it is
  * ready to be exported. We instantiate the Exporter using one of the default implementations provided
  * by the ControlsFX project or by defining a custom implementation. For this example, we will use the
  * <a href="https://bitbucket.org/controlsfx/controlsfx-exporter-apachepoi">ControlsFX Apache POI Exporter</a>.</p>
- *     
- * <pre>
- * {@code
+ *
+ * <pre>{@code
  * Exporter<Person> exporter = new ApachePoiExporter<>(Paths.get("System.getProperty("user.home") + "/poi.xlsx"), "JavaFX TableView");
  * exporter.create(tableView);
- * }
- * </pre>
+ * }</pre>
+ *
+ * <p>If required, we can also declare ColumnExporter's for a TableColumn. In the following example,
+ * we use a ColumnExporter to set the date format.</p>
+ *
+ * <pre>{@code
+ * TableColumn<Person, Date> dobCol = new TableColumn<>("Date of Birth");
+ * final ColumnExporter<Person, Date> dateTimeColumnExporter = new DateTimeColumnExporter<>(Person::getDob, "dd/MM/yyyy");
+ * ExporterUtils.setColumnExporter(dobCol, dateTimeColumnExporter);
+ * }</pre>
+ *
+ * <p>It is highly encouraged that developers using the exporter feature to observe the progress property 
+ * and prevent user interaction with the TableView whilst the export is being performed</p>
  *
  * @param <T> The type of the TableView generic type
  */
 public abstract class Exporter<T> {
 
+    private static final double DEFAULT_ROW_HEIGHT = 24.0;
+    private ExecutorService executor;
+
     protected final Path path;
 
     public Exporter(Path path) {
         this.path = path;
+        executor = Executors.newSingleThreadExecutor(r -> {
+            final Thread thread = new Thread(r);
+            thread.setDaemon(true);
+            thread.setName("exporter");
+            return thread;
+        });
     }
 
     /**
@@ -95,40 +133,29 @@ public abstract class Exporter<T> {
             throw new IOException("Cannot write to the path - " + path.toAbsolutePath().toString());
         }
 
-        // Creation of cells including header is 90% progress
+        // Creation of headers is 10% progress
+        // Creation of cells is 80% progress
         // Writing to the file adds 10% more
-        final Thread exporterThread = new Thread(() -> {
-            createHeaders(tableView);
-            createCells(tableView);
-            applyColumnWidth(tableView);
-            try (OutputStream outputStream = Files.newOutputStream(path)) {
-                writeToFile(outputStream);
-                progress.set(1.0);
-            } catch (IOException e) {
-                e.printStackTrace();
-            }
-        });
-        exporterThread.setName("exporter");
-        exporterThread.setDaemon(true);
-        exporterThread.start();
+        executeOnBackgroundThread(() -> createHeaders(tableView));
+        executeOnBackgroundThread(() -> applyColumnWidth(tableView));
+        executeOnBackgroundThread(() -> createCellsAndWriteToFile(tableView));
     }
 
     /**
      * Creates a cell for the header row (i.e. index 0) at the specified column index.
      * @param columnIndex The column index of the header cell.
      * @param header The value for the header cell.
-     * @param tableColumn The TableColumn of the JavaFX TableView corresponding to the column index.
+     * @param tableColumnHeader The TableColumnHeader of the JavaFX TableView corresponding to the column index.
      */
-    protected abstract void createHeaderCell(int columnIndex, String header, TableColumn<T, ?> tableColumn);
+    protected abstract void createHeaderCell(int columnIndex, String header, TableColumnHeader tableColumnHeader);
 
     /**
      * Creates a cell at the specified row and column index.
      * @param rowIndex The row index of the cell. Ideally, should start be from index 1.
      * @param columnIndex The column index of the cell.
-     * @param item The value for the cell.
-     * @param tableColumn The TableColumn of the JavaFX TableView corresponding to the column index.
+     * @param tableCell The TableCell at the corresponding row and column index.
      */
-    protected abstract void createCell(int rowIndex, int columnIndex, T item, TableColumn<T, ?> tableColumn);
+    protected abstract void createCell(int rowIndex, int columnIndex, TableCell<T, ?> tableCell);
 
     /**
      * Applies the column width to the specified column of the excel sheet.
@@ -145,6 +172,18 @@ public abstract class Exporter<T> {
     protected abstract void writeToFile(OutputStream outputStream) throws IOException;
 
     /**
+     * Represents the progress of the export task. It is highly encouraged that developers using the exporter feature 
+     * to observe the progress property and prevent user interaction with the TableView whilst the export is being performed.
+     */
+    private final ReadOnlyDoubleWrapper progress = new ReadOnlyDoubleWrapper(this, "progress", 0.0);
+    public final ReadOnlyDoubleProperty progressProperty() {
+        return progress.getReadOnlyProperty();
+    }
+    public final double getProgress() {
+        return progress.get();
+    }
+
+    /**
      * Extracts the column text from the supplied TableView to be used
      * as the first row in the Excel file. The implementation can make use of the 
      * method to get the list of headers in the TableView.
@@ -156,45 +195,19 @@ public abstract class Exporter<T> {
         return columns.stream().map(TableColumn::getText).collect(Collectors.toList());
     }
 
-    /**
-     * Represents the progress of the export task.
-     */
-    private final ReadOnlyDoubleWrapper progress = new ReadOnlyDoubleWrapper(this, "progress", 0.0);
-    public final ReadOnlyDoubleProperty progressProperty() {
-        return progress.getReadOnlyProperty();
-    }
-    public final double getProgress() {
-        return progress.get();
-    }
-
     private void createHeaders(TableView<T> tableView) {
         final List<String> headers = getHeaders(tableView);
-        final int totalNoOfCells = headers.size() * tableView.getItems().size() + headers.size(); // Adding header cells as well
+
+        // Should we use lookUpAll() here?
+        final TableViewSkin<?> skin = (TableViewSkin<?>) tableView.getSkin();
+        TableHeaderRow tableHeader = skin.getTableHeaderRow();
+        NestedTableColumnHeader rootHeader = tableHeader.getRootHeader();
+
         // Create header columns
         for (int columnIndex = 0; columnIndex < headers.size(); columnIndex++) {
-            createHeaderCell(columnIndex, headers.get(columnIndex), tableView.getColumns().get(columnIndex));
-            progress.set(progress.get() + (0.9 / totalNoOfCells));
-        }
-    }
-
-    private void createCells(TableView<T> tableView) {
-        final ObservableList<TableColumn<T, ?>> columns = tableView.getColumns();
-        final ObservableList<T> items = tableView.getItems();
-        final int totalNoOfCells = columns.size() * tableView.getItems().size() + columns.size();
-
-        // We loop on items first rather than columns because generally rows.size > columns.size.
-        // If the performance is low, we can decide to switch the first loop to
-        // be on columns and call applyColumnWidth() from the loop.
-        // We could also implement a check to decide which path to take.
-        for (int itemIndex = 0; itemIndex < items.size(); itemIndex++) {
-            // Header is already added as row 0
-            final int rowIndex = itemIndex + 1;
-            final T item = items.get(itemIndex);
-            for (int columnIndex = 0; columnIndex < columns.size(); columnIndex++) {
-                final TableColumn<T, ?> tableColumn = columns.get(columnIndex);
-                createCell(rowIndex, columnIndex, item, tableColumn);
-                progress.set(progress.get() + (0.9 / totalNoOfCells));
-            }
+            final TableColumnHeader tableColumnHeader = rootHeader.getColumnHeaders().get(columnIndex);
+            createHeaderCell(columnIndex, headers.get(columnIndex), tableColumnHeader);
+            progress.set(progress.get() + (0.1 / headers.size()));
         }
     }
 
@@ -203,5 +216,106 @@ public abstract class Exporter<T> {
             final double columnWidth = tableView.getColumns().get(columnIndex).getWidth();
             setColumnWidth(columnIndex, columnWidth);
         }
+    }
+
+    private void createFile() {
+        // Write Excel to file system
+        try (OutputStream outputStream = Files.newOutputStream(path)) {
+            writeToFile(outputStream);
+            progress.set(1.0);
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
+
+    // Fields to be used for cell extraction process
+    private final AtomicInteger rowCounter = new AtomicInteger(0);
+    private final AtomicInteger rowDelta = new AtomicInteger(10);
+    private final AtomicReference<Double> initialPosition = new AtomicReference<>(0.0);
+
+    private void createCellsAndWriteToFile(TableView<T> tableView) {
+        rowCounter.set(0);
+
+        final VirtualFlow<TableRow<T>> virtualFlow = (VirtualFlow) tableView.lookup(".virtual-flow");
+        if (virtualFlow != null) {
+            initialPosition.set(virtualFlow.getPosition());
+
+            final double tableHeight = tableView.getHeight();
+            final int delta = (int) (tableHeight / DEFAULT_ROW_HEIGHT) - 1;
+            if (delta > 0) {
+                rowDelta.set(delta);
+            }
+
+            executeOnUIThread(scrollAndLayoutTable(tableView, virtualFlow));
+        }
+    }
+
+    private Runnable scrollAndLayoutTable(TableView<T> tableView, VirtualFlow<TableRow<T>> virtualFlow) {
+        return () -> {
+            // Make sure the table is at initial position 0
+            // Scroll the TableView in Y direction
+            tableView.scrollTo(rowCounter.get());
+            tableView.layout();
+            executeOnBackgroundThread(extractCellsFrom(tableView, virtualFlow));
+        };
+    }
+
+    private Runnable scrollToInitialPosition(TableView<T> tableView, VirtualFlow<TableRow<T>> virtualFlow) {
+        return () -> {
+            // After cell creation, scroll back to initial position
+            if (virtualFlow != null) {
+                virtualFlow.setPosition(initialPosition.get());
+            } else {
+                tableView.scrollTo(0);
+            }
+            tableView.layout();
+            executeOnBackgroundThread(this::createFile);
+        };
+    }
+
+    private Runnable extractCellsFrom(TableView<T> tableView, VirtualFlow<TableRow<T>> virtualFlow) {
+        return () -> {
+            if (rowCounter.get() < tableView.getItems().size()) {
+                // For ordering, we get the index from the IndexedCell
+                final Map<Integer, TableRow> indexRowMap =
+                        IntStream.range(rowCounter.get(), rowCounter.get() + rowDelta.get())
+                                .mapToObj(virtualFlow::getCell)
+                                .filter(tr -> tr.getIndex() >= rowCounter.get())
+                                .filter(tr -> tr.getIndex() < rowCounter.get() + rowDelta.get())
+                                .filter(tr -> tr.getIndex() < tableView.getItems().size())
+                                .filter(tr -> tr.getItem() != null)
+                                .collect(Collectors.toMap(TableRow::getIndex, Function.identity()));
+
+                // We loop on items first rather than columns because generally rows.size > columns.size.
+                // If the performance is low, we can decide to switch the first loop to
+                // be on columns and call applyColumnWidth() from the loop.
+                // We could also implement a check to decide which path to take.
+                for (Map.Entry<Integer, TableRow> tableRowEntry : indexRowMap.entrySet()) {
+                    final TableRow tableRow = tableRowEntry.getValue();
+                    final ObservableList<Node> tableCells = tableRow.getChildrenUnmodifiable();
+                    for (Node tableCell : tableCells) {
+                        TableCell<T, ?> tc = (TableCell<T, ?>) tableCell;
+                        if (tableView.getVisibleLeafColumns().contains(tc.getTableColumn())) {
+                            int columnIndex = tableView.getVisibleLeafIndex(tc.getTableColumn());
+                            // We add 1 to the rowIndex since 1st row is already occupied by header
+                            createCell(tableRowEntry.getKey() + 1, columnIndex, tc);
+                        }
+                    }
+                    progress.set(progress.get() + (0.8 / tableView.getItems().size()));
+                }
+                rowCounter.addAndGet(rowDelta.get());
+                executeOnUIThread(scrollAndLayoutTable(tableView, virtualFlow));
+            } else {
+                executeOnUIThread(scrollToInitialPosition(tableView, virtualFlow));
+            }
+        };
+    }
+
+    private void executeOnUIThread(Runnable runnable) {
+        Platform.runLater(runnable);
+    }
+
+    private void executeOnBackgroundThread(Runnable runnable) {
+        executor.execute(runnable);
     }
 }
