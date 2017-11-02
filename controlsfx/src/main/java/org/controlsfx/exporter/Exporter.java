@@ -12,6 +12,7 @@ import javafx.collections.ObservableList;
 import javafx.scene.Node;
 import javafx.scene.control.TableCell;
 import javafx.scene.control.TableColumn;
+import javafx.scene.control.TablePosition;
 import javafx.scene.control.TableRow;
 import javafx.scene.control.TableView;
 
@@ -19,12 +20,12 @@ import java.io.IOException;
 import java.io.OutputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicInteger;
-import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
@@ -231,14 +232,19 @@ public abstract class Exporter<T> {
     // Fields to be used for cell extraction process
     private final AtomicInteger rowCounter = new AtomicInteger(0);
     private final AtomicInteger rowDelta = new AtomicInteger(10);
-    private final AtomicReference<Double> initialPosition = new AtomicReference<>(0.0);
-
+    private final TableDefault tableDefault = new TableDefault();
+    
     private void createCellsAndWriteToFile(TableView<T> tableView) {
         rowCounter.set(0);
 
+        // Store selected cells and clear selection
+        final ObservableList<TablePosition> selectedCells = tableView.getSelectionModel().getSelectedCells();
+        tableDefault.setSelectedCell(new ArrayList<>(selectedCells));
+        tableView.getSelectionModel().clearSelection();
+        
         final VirtualFlow<TableRow<T>> virtualFlow = (VirtualFlow) tableView.lookup(".virtual-flow");
         if (virtualFlow != null) {
-            initialPosition.set(virtualFlow.getPosition());
+            tableDefault.setPosition(virtualFlow.getPosition());
 
             final double tableHeight = tableView.getHeight();
             final int delta = (int) (tableHeight / DEFAULT_ROW_HEIGHT) - 1;
@@ -260,15 +266,21 @@ public abstract class Exporter<T> {
         };
     }
 
-    private Runnable scrollToInitialPosition(TableView<T> tableView, VirtualFlow<TableRow<T>> virtualFlow) {
+    private Runnable restoreDefaults(TableView<T> tableView, VirtualFlow<TableRow<T>> virtualFlow) {
         return () -> {
             // After cell creation, scroll back to initial position
             if (virtualFlow != null) {
-                virtualFlow.setPosition(initialPosition.get());
+                virtualFlow.setPosition(tableDefault.getPosition());
             } else {
                 tableView.scrollTo(0);
             }
             tableView.layout();
+            
+            // Select the previously selected cells
+            final List<TablePosition> selectedCells = tableDefault.getSelectedCell();
+            if (selectedCells != null) {
+                selectedCells.forEach(tp -> tableView.getSelectionModel().select(tp.getRow(), tp.getTableColumn()));
+            }
             executeOnBackgroundThread(this::createFile);
         };
     }
@@ -306,7 +318,7 @@ public abstract class Exporter<T> {
                 rowCounter.addAndGet(rowDelta.get());
                 executeOnUIThread(scrollAndLayoutTable(tableView, virtualFlow));
             } else {
-                executeOnUIThread(scrollToInitialPosition(tableView, virtualFlow));
+                executeOnUIThread(restoreDefaults(tableView, virtualFlow));
             }
         };
     }
@@ -317,5 +329,27 @@ public abstract class Exporter<T> {
 
     private void executeOnBackgroundThread(Runnable runnable) {
         executor.execute(runnable);
+    }
+    
+    private class TableDefault {
+        
+        private double position;
+        private List<TablePosition> selectedCell;
+
+        public double getPosition() {
+            return position;
+        }
+
+        public void setPosition(double position) {
+            this.position = position;
+        }
+
+        List<TablePosition> getSelectedCell() {
+            return selectedCell;
+        }
+
+        void setSelectedCell(List<TablePosition> selectedCell) {
+            this.selectedCell = selectedCell;
+        }
     }
 }
