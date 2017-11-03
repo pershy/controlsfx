@@ -15,6 +15,7 @@ import javafx.scene.control.TableColumn;
 import javafx.scene.control.TablePosition;
 import javafx.scene.control.TableRow;
 import javafx.scene.control.TableView;
+import javafx.util.Callback;
 
 import java.io.IOException;
 import java.io.OutputStream;
@@ -126,10 +127,11 @@ public abstract class Exporter<T> {
     }
 
     /**
-     * Creates the excel file at the specified path. This runs on a background thread.
+     * Creates the excel file at the specified path.
      * @param tableView TableView to be converted to excel.
+     * @param styleExport {@link StyleExport} to decide if the export needs to extract cell styles.
      */
-    public void export(TableView<T> tableView) throws IOException {
+    public void export(TableView<T> tableView, StyleExport styleExport) throws IOException {
         if (Files.exists(path) && !Files.isWritable(path)) {
             throw new IOException("Cannot write to the path - " + path.toAbsolutePath().toString());
         }
@@ -139,7 +141,29 @@ public abstract class Exporter<T> {
         // Writing to the file adds 10% more
         executeOnBackgroundThread(() -> createHeaders(tableView));
         executeOnBackgroundThread(() -> applyColumnWidth(tableView));
-        executeOnBackgroundThread(() -> createCellsAndWriteToFile(tableView));
+        executeOnBackgroundThread(() -> {
+            if (styleExport == StyleExport.APPLY_STYLES) {
+                createCellsWithStyleAndWriteToFile(tableView);
+            } else {
+                createCells(tableView);
+                createFile();
+            }
+        });
+    }
+
+    /**
+     * Decides if export needs to copy cell styles along with the cell data.
+     */
+    public enum StyleExport {
+        /**
+         * Exports only the data from the TableView. No visual scroll of the TableView is required.
+         */
+        NO_STYLES,
+        /**
+         * Exports data along with basic cell styles like background color, border, font etc.
+         * A visual scroll of the TableView is required to extract cell styles.
+         */
+        APPLY_STYLES
     }
 
     /**
@@ -155,8 +179,9 @@ public abstract class Exporter<T> {
      * @param rowIndex The row index of the cell. Ideally, should start be from index 1.
      * @param columnIndex The column index of the cell.
      * @param tableCell The TableCell at the corresponding row and column index.
+     * @param styleExport {@link StyleExport} to decide if the cells needs to be created with styles.
      */
-    protected abstract void createCell(int rowIndex, int columnIndex, TableCell<T, ?> tableCell);
+    protected abstract void createCell(int rowIndex, int columnIndex, TableCell<T, ?> tableCell, StyleExport styleExport);
 
     /**
      * Applies the column width to the specified column of the excel sheet.
@@ -229,12 +254,43 @@ public abstract class Exporter<T> {
         }
     }
 
+    private void createCells(TableView<T> tableView) {
+
+        final ObservableList<T> items = tableView.getItems();
+        // We loop on items first rather than columns because generally rows.size > columns.size.
+        // If the performance is low, we can decide to switch the first loop to
+        // be on columns and call applyColumnWidth() from the loop.
+        // We could also implement a check to decide which path to take.
+        for (int rowIndex = 0; rowIndex < items.size(); rowIndex++) {
+            final ObservableList<TableColumn<T, ?>> visibleLeafColumns = tableView.getVisibleLeafColumns();
+            for (int columnIndex = 0; columnIndex < visibleLeafColumns.size(); columnIndex++) {
+                TableColumn<T, ?> tableColumn = visibleLeafColumns.get(columnIndex);
+                final Callback<TableColumn<T, ?>, TableCell<T, ?>> cellCallback = (Callback<TableColumn<T, ?>, TableCell<T, ?>>) ((Callback) tableColumn.cellFactoryProperty().getValue());
+                if (cellCallback == null) return;
+                final TableCell<T, ?> tableCell = cellCallback.call(tableColumn);
+                if (tableCell == null) return;
+
+                // we set it's TableColumn, TableView and TableRow
+                tableCell.updateTableColumn(tableColumn);
+                tableCell.updateTableView(tableColumn.getTableView());
+                tableCell.updateIndex(rowIndex);
+
+                if ((tableCell.getText() != null && !tableCell.getText().isEmpty()) || tableCell.getGraphic() != null) {
+                    createCell(rowIndex + 1, columnIndex, tableCell, StyleExport.NO_STYLES);
+                }
+                // dispose of the cell to prevent it retaining listeners (see RT-31015)
+                tableCell.updateIndex(-1);
+            }
+            progress.set(progress.get() + (0.8 / tableView.getItems().size()));
+        }
+    }
+
     // Fields to be used for cell extraction process
     private final AtomicInteger rowCounter = new AtomicInteger(0);
     private final AtomicInteger rowDelta = new AtomicInteger(10);
     private final TableDefault tableDefault = new TableDefault();
     
-    private void createCellsAndWriteToFile(TableView<T> tableView) {
+    private void createCellsWithStyleAndWriteToFile(TableView<T> tableView) {
         rowCounter.set(0);
 
         // Store selected cells and clear selection
@@ -310,7 +366,7 @@ public abstract class Exporter<T> {
                         if (tableView.getVisibleLeafColumns().contains(tc.getTableColumn())) {
                             int columnIndex = tableView.getVisibleLeafIndex(tc.getTableColumn());
                             // We add 1 to the rowIndex since 1st row is already occupied by header
-                            createCell(tableRowEntry.getKey() + 1, columnIndex, tc);
+                            createCell(tableRowEntry.getKey() + 1, columnIndex, tc, StyleExport.APPLY_STYLES);
                         }
                     }
                     progress.set(progress.get() + (0.8 / tableView.getItems().size()));
