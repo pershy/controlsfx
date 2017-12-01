@@ -1,9 +1,10 @@
 package org.controlsfx.exporter;
 
+import com.sun.javafx.scene.control.behavior.TableViewBehavior;
 import com.sun.javafx.scene.control.skin.NestedTableColumnHeader;
 import com.sun.javafx.scene.control.skin.TableColumnHeader;
 import com.sun.javafx.scene.control.skin.TableHeaderRow;
-import com.sun.javafx.scene.control.skin.TableViewSkin;
+import com.sun.javafx.scene.control.skin.TableViewSkinBase;
 import com.sun.javafx.scene.control.skin.VirtualFlow;
 import javafx.application.Platform;
 import javafx.beans.property.ReadOnlyDoubleProperty;
@@ -26,7 +27,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
-import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
@@ -225,7 +225,7 @@ public abstract class Exporter<T> {
         final List<String> headers = getHeaders(tableView);
 
         // Should we use lookUpAll() here?
-        final TableViewSkin<?> skin = (TableViewSkin<?>) tableView.getSkin();
+        final TableViewSkinBase<T,T,TableView<T>,TableViewBehavior<T>,TableRow<T>,TableColumn<T,?>> skin = (TableViewSkinBase<T,T,TableView<T>,TableViewBehavior<T>,TableRow<T>,TableColumn<T,?>>) tableView.getSkin();
         TableHeaderRow tableHeader = skin.getTableHeaderRow();
         NestedTableColumnHeader rootHeader = tableHeader.getRootHeader();
 
@@ -286,13 +286,10 @@ public abstract class Exporter<T> {
     }
 
     // Fields to be used for cell extraction process
-    private final AtomicInteger rowCounter = new AtomicInteger(0);
-    private final AtomicInteger rowDelta = new AtomicInteger(10);
+    // Store the initial position and selected cell before scrolling takes place
     private final TableDefault tableDefault = new TableDefault();
     
     private void createCellsWithStyleAndWriteToFile(TableView<T> tableView) {
-        rowCounter.set(0);
-
         // Store selected cells and clear selection
         final ObservableList<TablePosition> selectedCells = tableView.getSelectionModel().getSelectedCells();
         tableDefault.setSelectedCell(new ArrayList<>(selectedCells));
@@ -301,24 +298,19 @@ public abstract class Exporter<T> {
         final VirtualFlow<TableRow<T>> virtualFlow = (VirtualFlow) tableView.lookup(".virtual-flow");
         if (virtualFlow != null) {
             tableDefault.setPosition(virtualFlow.getPosition());
-
-            final double tableHeight = tableView.getHeight();
-            final int delta = (int) (tableHeight / DEFAULT_ROW_HEIGHT) - 1;
-            if (delta > 0) {
-                rowDelta.set(delta);
-            }
-
-            executeOnUIThread(scrollAndLayoutTable(tableView, virtualFlow));
+            // Make sure the table is at initial position 0, 0
+            executeOnUIThread(scrollAndLayoutTable(tableView, virtualFlow, 0, 0));
         }
     }
 
-    private Runnable scrollAndLayoutTable(TableView<T> tableView, VirtualFlow<TableRow<T>> virtualFlow) {
+    private Runnable scrollAndLayoutTable(TableView<T> tableView, VirtualFlow<TableRow<T>> virtualFlow, int rowIndex, int columnIndex) {
         return () -> {
-            // Make sure the table is at initial position 0
+            // Scroll the TableView in X direction
+            tableView.scrollToColumnIndex(columnIndex);
             // Scroll the TableView in Y direction
-            tableView.scrollTo(rowCounter.get());
+            tableView.scrollTo(rowIndex);
             tableView.layout();
-            executeOnBackgroundThread(extractCellsFrom(tableView, virtualFlow));
+            executeOnBackgroundThread(extractCellsFrom(tableView, virtualFlow, rowIndex));
         };
     }
 
@@ -341,42 +333,70 @@ public abstract class Exporter<T> {
         };
     }
 
-    private Runnable extractCellsFrom(TableView<T> tableView, VirtualFlow<TableRow<T>> virtualFlow) {
+    private Runnable extractCellsFrom(TableView<T> tableView, VirtualFlow<TableRow<T>> virtualFlow, int startRowIndex) {
         return () -> {
-            if (rowCounter.get() < tableView.getItems().size()) {
+            final int totalNoOfRows = tableView.getItems().size();
+            
+            int endRowIndex = getNextRowIndex(tableView, startRowIndex);
+            if (startRowIndex < totalNoOfRows) {
                 // For ordering, we get the index from the IndexedCell
                 final Map<Integer, TableRow> indexRowMap =
-                        IntStream.range(rowCounter.get(), rowCounter.get() + rowDelta.get())
+                        IntStream.range(startRowIndex, endRowIndex)
                                 .mapToObj(virtualFlow::getCell)
-                                .filter(tr -> tr.getIndex() >= rowCounter.get())
-                                .filter(tr -> tr.getIndex() < rowCounter.get() + rowDelta.get())
-                                .filter(tr -> tr.getIndex() < tableView.getItems().size())
+                                .filter(tr -> tr.getIndex() >= startRowIndex)
+                                .filter(tr -> tr.getIndex() < endRowIndex)
+                                .filter(tr -> tr.getIndex() < totalNoOfRows)
                                 .filter(tr -> tr.getItem() != null)
                                 .collect(Collectors.toMap(TableRow::getIndex, Function.identity()));
-
+                
+                int maxColumnIndex = 0;
+                final ObservableList<TableColumn<T, ?>> visibleLeafColumns = tableView.getVisibleLeafColumns();
                 // We loop on items first rather than columns because generally rows.size > columns.size.
                 // If the performance is low, we can decide to switch the first loop to
                 // be on columns and call applyColumnWidth() from the loop.
                 // We could also implement a check to decide which path to take.
                 for (Map.Entry<Integer, TableRow> tableRowEntry : indexRowMap.entrySet()) {
                     final TableRow tableRow = tableRowEntry.getValue();
-                    final ObservableList<Node> tableCells = tableRow.getChildrenUnmodifiable();
-                    for (Node tableCell : tableCells) {
-                        TableCell<T, ?> tc = (TableCell<T, ?>) tableCell;
-                        if (tableView.getVisibleLeafColumns().contains(tc.getTableColumn())) {
-                            int columnIndex = tableView.getVisibleLeafIndex(tc.getTableColumn());
-                            // We add 1 to the rowIndex since 1st row is already occupied by header
-                            createCell(tableRowEntry.getKey() + 1, columnIndex, tc, StyleExport.APPLY_STYLES);
+                    final ObservableList<Node> children = tableRow.getChildrenUnmodifiable();
+                    for (Node child : children) {
+                        if (child instanceof TableCell) {
+                            TableCell<T, ?> tc = (TableCell<T, ?>) child;
+                            if (visibleLeafColumns.contains(tc.getTableColumn())) {
+                                int columnIndex = tableView.getVisibleLeafIndex(tc.getTableColumn());
+                                // We add 1 to the rowIndex since 1st row is already occupied by header
+                                createCell(tableRowEntry.getKey() + 1, columnIndex, tc, StyleExport.APPLY_STYLES);
+                                maxColumnIndex = Math.max(columnIndex, maxColumnIndex);
+                                progress.set(progress.get() + (0.8 / (totalNoOfRows * visibleLeafColumns.size())));
+                            }
                         }
                     }
-                    progress.set(progress.get() + (0.8 / tableView.getItems().size()));
                 }
-                rowCounter.addAndGet(rowDelta.get());
-                executeOnUIThread(scrollAndLayoutTable(tableView, virtualFlow));
+                // Check if TableView has to scroll horizontally or vertically
+                // If we haven't reached the end of columns keep scroll horizontally
+                if (maxColumnIndex != visibleLeafColumns.size() - 1) {
+                    executeOnUIThread(scrollAndLayoutTable(tableView, virtualFlow, startRowIndex, maxColumnIndex + 1));
+                } else {
+                    executeOnUIThread(scrollAndLayoutTable(tableView, virtualFlow, endRowIndex, 0));
+                }
             } else {
                 executeOnUIThread(restoreDefaults(tableView, virtualFlow));
             }
         };
+    }
+
+    // This is used to get the end row index from the
+    // start row index such that the height of the 
+    // set of rows that lie between these indices can 
+    // fit inside the VirtualFlow.
+    // This method can have multiple implementations and can be set as a property
+    // with the following being a default implementation
+    private int getNextRowIndex(TableView<T> tableView, int initialRowIndex) {
+        final double tableHeight = tableView.getHeight();
+        final int delta = (int) (tableHeight / DEFAULT_ROW_HEIGHT) - 1;
+        if (delta > 0) {
+            return initialRowIndex + delta;
+        }
+        return initialRowIndex;
     }
 
     private void executeOnUIThread(Runnable runnable) {
