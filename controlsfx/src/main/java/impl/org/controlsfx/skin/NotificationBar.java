@@ -66,7 +66,7 @@ public abstract class NotificationBar extends Region {
     ButtonBar actionsBar;
     Button closeBtn;
 
-    private final GridPane pane;
+    final GridPane pane;
     
     public DoubleProperty transition = new SimpleDoubleProperty() {
         @Override protected void invalidated() {
@@ -122,8 +122,8 @@ public abstract class NotificationBar extends Region {
         // initialise label area
         label = new Label();
         label.setMaxSize(Double.MAX_VALUE, Double.MAX_VALUE);
-        GridPane.setVgrow(label, Priority.ALWAYS);
-        GridPane.setHgrow(label, Priority.ALWAYS);
+        GridPane.setVgrow(label, Priority.NEVER);
+        GridPane.setHgrow(label, Priority.NEVER);
 
         label.setText(getText());
         label.setGraphic(getGraphic());

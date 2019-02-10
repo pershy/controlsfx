@@ -40,15 +40,39 @@ import com.sun.javafx.scene.control.behavior.BehaviorBase;
 import com.sun.javafx.scene.control.behavior.KeyBinding;
 import com.sun.javafx.scene.control.skin.BehaviorSkinBase;
 
-public class NotificationPaneSkin extends BehaviorSkinBase<NotificationPane, BehaviorBase<NotificationPane>> {
+public class NotificationPaneSkin<T extends NotificationPane> extends BehaviorSkinBase<T, BehaviorBase<T>> {
 
-    private NotificationBar notificationBar;
+    NotificationBar notificationBar;
     private Node content;
-    private Rectangle clip = new Rectangle();
+    Rectangle clip = new Rectangle();
 
-    public NotificationPaneSkin(final NotificationPane control) {
+    public NotificationPaneSkin(final T control) {
         super(control, new BehaviorBase<>(control, Collections.<KeyBinding> emptyList()));
 
+        createBar(control);
+
+        control.setClip(clip);
+        updateContent();
+
+        registerListeners(control);
+
+        // Fix for Issue #522: Prevent NotificationPane from receiving focus
+        ParentTraversalEngine engine = new ParentTraversalEngine(getSkinnable());
+        getSkinnable().setImpl_traversalEngine(engine);
+        engine.setOverriddenFocusTraversability(false);
+    }
+
+    protected void registerListeners(T control) {
+        registerChangeListener(control.heightProperty(), "HEIGHT"); //$NON-NLS-1$
+        registerChangeListener(control.contentProperty(), "CONTENT"); //$NON-NLS-1$
+        registerChangeListener(control.textProperty(), "TEXT"); //$NON-NLS-1$
+        registerChangeListener(control.graphicProperty(), "GRAPHIC"); //$NON-NLS-1$
+        registerChangeListener(control.showingProperty(), "SHOWING"); //$NON-NLS-1$
+        registerChangeListener(control.showFromTopProperty(), "SHOW_FROM_TOP"); //$NON-NLS-1$
+        registerChangeListener(control.closeButtonVisibleProperty(), "CLOSE_BUTTON_VISIBLE"); //$NON-NLS-1$
+    }
+
+    protected void createBar(T control) {
         notificationBar = new NotificationBar() {
             @Override public void requestContainerLayout() {
                 control.requestLayout();
@@ -90,24 +114,8 @@ public class NotificationPaneSkin extends BehaviorSkinBase<NotificationPane, Beh
                 notificationBar.relocate(x, y);
             }
         };
-
-        control.setClip(clip);
-        updateContent();
-
-        registerChangeListener(control.heightProperty(), "HEIGHT"); //$NON-NLS-1$
-        registerChangeListener(control.contentProperty(), "CONTENT"); //$NON-NLS-1$
-        registerChangeListener(control.textProperty(), "TEXT"); //$NON-NLS-1$
-        registerChangeListener(control.graphicProperty(), "GRAPHIC"); //$NON-NLS-1$
-        registerChangeListener(control.showingProperty(), "SHOWING"); //$NON-NLS-1$
-        registerChangeListener(control.showFromTopProperty(), "SHOW_FROM_TOP"); //$NON-NLS-1$
-        registerChangeListener(control.closeButtonVisibleProperty(), "CLOSE_BUTTON_VISIBLE"); //$NON-NLS-1$
-
-        // Fix for Issue #522: Prevent NotificationPane from receiving focus
-        ParentTraversalEngine engine = new ParentTraversalEngine(getSkinnable());
-        getSkinnable().setImpl_traversalEngine(engine);
-        engine.setOverriddenFocusTraversability(false);
     }
-    
+
     @Override protected void handleControlPropertyChanged(String p) {
         super.handleControlPropertyChanged(p);
         
@@ -137,7 +145,7 @@ public class NotificationPaneSkin extends BehaviorSkinBase<NotificationPane, Beh
         }
     }
     
-    private void updateContent() {
+    void updateContent() {
         if (content != null) {
             getChildren().remove(content);
         }

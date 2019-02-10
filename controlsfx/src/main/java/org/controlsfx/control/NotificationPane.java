@@ -28,14 +28,8 @@ package org.controlsfx.control;
 
 import impl.org.controlsfx.skin.NotificationPaneSkin;
 import java.util.UUID;
-import javafx.beans.property.BooleanProperty;
-import javafx.beans.property.ObjectProperty;
-import javafx.beans.property.ReadOnlyBooleanProperty;
-import javafx.beans.property.ReadOnlyBooleanWrapper;
-import javafx.beans.property.SimpleBooleanProperty;
-import javafx.beans.property.SimpleObjectProperty;
-import javafx.beans.property.SimpleStringProperty;
-import javafx.beans.property.StringProperty;
+
+import javafx.beans.property.*;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
 import javafx.event.Event;
@@ -46,6 +40,7 @@ import javafx.scene.control.Skin;
 import javafx.scene.web.WebView;
 
 import org.controlsfx.control.action.Action;
+import org.controlsfx.validation.ValidationMessage;
 
 /**
  * The NotificationPane control is a container control that, when prompted by
@@ -309,8 +304,7 @@ public class NotificationPane extends ControlsFXControl {
     public final String getText() {
         return text.get();
     }
-    
-    
+
     // --- graphic
     private ObjectProperty<Node> graphic = new SimpleObjectProperty<>(this, "graphic"); //$NON-NLS-1$
     
